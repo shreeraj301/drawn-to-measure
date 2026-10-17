@@ -17,10 +17,9 @@ export function Intro() {
       return;
     }
     const timers = [
-      window.setTimeout(() => setPhase(1), 400),
-      window.setTimeout(() => setPhase(2), 1600),
-      window.setTimeout(() => setPhase(3), 2800),
-      window.setTimeout(() => setDone(true), 2600),
+      window.setTimeout(() => setPhase(1), 700),
+      window.setTimeout(() => setPhase(2), 1500),
+      window.setTimeout(() => setDone(true), 8200),
     ];
     const skip = () => {
       timers.forEach((t) => window.clearTimeout(t));
@@ -38,10 +37,12 @@ export function Intro() {
   if (done) return null;
 
   return (
-    <div className="sn-intro" aria-hidden={phase < 2}>
-      <p className={`sn-intro-line ${phase >= 1 ? "is-on" : ""}`}>A drawing of one person</p>
-      <h1 className={phase >= 2 ? "is-on" : ""}>Shreeraj Narwade, drawn to measure</h1>
-      <p className={`sn-intro-skip ${phase >= 1 ? "is-on" : ""}`}>Click or press any key to skip</p>
+    <div className="sn-intro">
+      <div className={`sn-intro-card ${phase >= 1 ? "is-on" : ""}`}>
+        <p className="sn-intro-line">A drawing of one person</p>
+        <h1 className={phase >= 2 ? "is-on" : ""}>Shreeraj Narwade, drawn to measure</h1>
+        <p className="sn-intro-skip">Click or press any key to skip</p>
+      </div>
     </div>
   );
 }

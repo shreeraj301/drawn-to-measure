@@ -153,12 +153,13 @@ export function CameraRig() {
       flight.active = false;
       return;
     }
+    const leavingPlan = camera.position.y > 16 && Math.hypot(camera.position.x, camera.position.z) < 6;
     flight.fromPos.copy(camera.position);
     flight.fromTarget.copy(curTarget);
     flight.toPos.copy(shot.pos);
     flight.toTarget.copy(shot.target);
     flight.t = 0;
-    flight.duration = introDone ? 0.9 : 1.6;
+    flight.duration = leavingPlan ? 2.8 : 0.9;
     flight.active = true;
   }, [focus, view, camera, introDone]);
 

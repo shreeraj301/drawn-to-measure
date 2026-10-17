@@ -14,17 +14,6 @@ export function PathFinder() {
   const setPath = useGraphStore((s) => s.setPath);
   const setHop = useGraphStore((s) => s.setPathHop);
   const select = useGraphStore((s) => s.select);
-  if (!open) return null;
-
-  const run = (a: string | null, b: string | null) => {
-    if (!a || !b) {
-      setPath(null);
-      return;
-    }
-    const found = shortestPath(a, b);
-    setPath(found);
-    if (found && found[0]) select(found[0]);
-  };
 
   const narrate = useMemo(() => {
     if (!path || path.length < 2) return [];
@@ -40,6 +29,18 @@ export function PathFinder() {
       };
     });
   }, [path]);
+
+  if (!open) return null;
+
+  const run = (a: string | null, b: string | null) => {
+    if (!a || !b) {
+      setPath(null);
+      return;
+    }
+    const found = shortestPath(a, b);
+    setPath(found);
+    if (found && found[0]) select(found[0]);
+  };
 
   return (
     <section className="sn-panel sn-path" aria-label="Path finder">
