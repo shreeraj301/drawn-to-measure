@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Drawn to Measure",
+      "hasCanvas": true,
+      "bodyTextLen": 644,
+      "bodyTextHash": "4a0e69350463674c740cdc9856f1ef667dc3f893bbaac80026ceb6cada09f2f9",
+      "bodyTextPrefix": "Shreeraj Narwade, drawn to measure SHEET 01 Drawn to Measure Pla",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Drawn to Measure",
+      "hasCanvas": true,
+      "bodyTextLen": 414,
+      "bodyTextHash": "430454ab1166f1f00b0988a76395ab84f66d6212556c0f561ad6c6e9d02c458a",
+      "bodyTextPrefix": "Shreeraj Narwade, drawn to measure COMMUNITIES Thesis & the pivo",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}

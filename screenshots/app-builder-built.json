@@ -1,0 +1,41 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Drawn to Measure",
+      "hasCanvas": true,
+      "bodyTextLen": 354,
+      "bodyTextHash": "7b22f292e016100dbe872d66d4ccc617d5c603590fa776171f67cda429759755",
+      "bodyTextPrefix": "Shreeraj Narwade, drawn to measure SHEET 01 Drawn to Measure Pla",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Drawn to Measure",
+      "hasCanvas": true,
+      "bodyTextLen": 124,
+      "bodyTextHash": "720e02ae9987d433c83d8c4922755ce222f246ddf152465ae92b770777d2d6c5",
+      "bodyTextPrefix": "Shreeraj Narwade, drawn to measure A DRAWING OF ONE PERSON Shree",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": true,
+  "baselineReasons": [
+    "desktop: body text changed (644 -> 354 chars, hash mismatch)",
+    "mobile: body text collapsed (414 -> 124 chars)"
+  ]
+}
