@@ -1,6 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { GraphScene } from "@/scene/GraphScene";
-import { LabelLayer } from "@/scene/Labels";
 import { readHash, writeHash } from "@/lib/graph/hash";
 import { getNode, neighborsOf } from "@/lib/graph/model";
 import { tourById } from "@/lib/graph/tours";
@@ -13,6 +12,8 @@ import { SidePanel } from "./SidePanel";
 import { TitleBlock } from "./TitleBlock";
 import { Toolbar } from "./Toolbar";
 import { TourCaption } from "./Tours";
+import { DrawingBoundary, DrawingFallback } from "./DrawingFallback";
+import { HoverCard } from "./HoverCard";
 import { HelpGuide } from "./HelpGuide";
 import { SelectionCaption } from "./SelectionCaption";
 import { playHover, playSelect } from "./sound";
@@ -24,6 +25,15 @@ export function AppShell() {
   const setMobile = useGraphStore((s) => s.setMobile);
   const setPalette = useGraphStore((s) => s.setPaletteOpen);
   const paletteOpen = useGraphStore((s) => s.paletteOpen);
+  const [webgl] = useState(() => {
+    if (typeof document === "undefined") return true;
+    try {
+      const canvas = document.createElement("canvas");
+      return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -34,6 +44,13 @@ export function AppShell() {
     const applyM = () => setMobile(mobileMq.matches);
     applyM();
     mobileMq.addEventListener("change", applyM);
+    const themeMq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (themeMq.matches) useGraphStore.getState().setTheme("night");
+    const applyTheme = () => {
+      document.documentElement.dataset.theme = useGraphStore.getState().theme;
+    };
+    applyTheme();
+    const unsubTheme = useGraphStore.subscribe(applyTheme);
 
     const hash = readHash(window.location.hash);
     if (hash.view) setView(hash.view);
@@ -59,6 +76,7 @@ export function AppShell() {
     return () => {
       mq.removeEventListener("change", apply);
       mobileMq.removeEventListener("change", applyM);
+      unsubTheme();
     };
   }, [select, setMobile, setReduced, setView]);
 
@@ -160,13 +178,21 @@ export function AppShell() {
 
   return (
     <div className="sn-app">
+      <svg className="sn-rough-defs" width="0" height="0" aria-hidden>
+        <filter id="rough">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" />
+          <feDisplacementMap in="SourceGraphic" scale="2.2" />
+        </filter>
+      </svg>
       <a className="sn-skip" href="#node-list">Skip to the list of nodes</a>
       <Toolbar />
       <div className="sn-frame">
         <SidePanel />
         <div className="sn-stage">
-          <GraphScene />
-          <LabelLayer />
+          <DrawingBoundary>
+            {webgl ? <GraphScene /> : <DrawingFallback reason="This browser cannot draw WebGL." />}
+          </DrawingBoundary>
+          <HoverCard />
           <SelectionCaption />
           <TitleBlock />
         </div>

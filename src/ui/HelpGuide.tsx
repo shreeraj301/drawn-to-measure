@@ -1,5 +1,5 @@
-import { X } from "lucide-react";
 import { useGraphStore } from "@/state/store";
+import { IconClose } from "./Icons";
 
 const ROWS = [
   ["1–4", "Switch view: plan, elevation, axonometric, perspective"],
@@ -18,7 +18,7 @@ export function HelpGuide() {
       <header>
         <h2>How to read the sheet</h2>
         <button type="button" onClick={() => setOpen(false)} aria-label="Close guide">
-          <X />
+          <IconClose />
         </button>
       </header>
       <ul>

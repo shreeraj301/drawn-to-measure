@@ -1,10 +1,9 @@
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
 import { COMMUNITIES, KINDS } from "@/lib/graph/model";
-import { communityColor } from "@/lib/graph/colors";
+import { communityColor, communityFamily } from "@/lib/graph/colors";
 import { TOURS } from "@/lib/graph/tours";
 import { useGraphStore } from "@/state/store";
-import { KindIcon } from "./Icons";
+import { IconClose, KindIcon } from "./Icons";
 import { PathFinder } from "./PathFinder";
 
 const TABS = [
@@ -54,7 +53,7 @@ export function SidePanel() {
           ))}
         </div>
         <button type="button" onClick={() => setTab(null)} aria-label="Close panel">
-          <X />
+          <IconClose />
         </button>
       </header>
       <div className="sn-dock-body" role="tabpanel">
@@ -139,7 +138,10 @@ function CommunitiesBody() {
                 title={c.name}
               >
                 <i style={{ background: communityColor(c.id) }} aria-hidden />
-                <span>{c.name}</span>
+                <span>
+                  {c.name}
+                  <small className="sn-family">{communityFamily(c.id)}</small>
+                </span>
                 <em className="tabular">{c.count}</em>
               </button>
             </li>

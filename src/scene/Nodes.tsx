@@ -1,44 +1,20 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
-  Color,
   type InstancedMesh,
   Object3D,
+  ShaderMaterial,
   SphereGeometry,
+  BufferGeometry,
+  Float32BufferAttribute,
+  Points,
+  LineSegments,
 } from "three";
-import { communityColor, nodeRadius } from "@/lib/graph/colors";
-import { DEGREE, LINKS, MAX_DEGREE, NODES, POSITIONS } from "@/lib/graph/model";
+import { DEGREE, LINKS, NODES, POSITIONS } from "@/lib/graph/model";
 import { useGraphStore } from "@/state/store";
-import { geometryForNode } from "./marks";
-
-const KINDS = [
-  "Project",
-  "Skill/Tool",
-  "Poem/Writing",
-  "Person",
-  "Place",
-  "Program/University",
-  "Bot/Agent",
-  "Theme",
-  "Goal/Career path",
-  "Channel",
-  "Education",
-  "Preference/Value",
-  "Experience",
-] as const;
-
+import { nodeAtlas } from "./atlas";
 
 const dummy = new Object3D();
-const colorScratch = new Color();
-
-function yawOf(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return ((h >>> 0) % 628) / 100;
-}
 
 type Live = {
   x: number;
@@ -67,35 +43,100 @@ export function indexOf(id: string): number {
   return indexById.get(id) ?? -1;
 }
 
-/** Which node indexes are hidden by the current filters. Written each frame by Nodes. */
 export const hiddenFlags = new Uint8Array(NODES.length);
 
 function kindHidden(kind: string, kinds: Record<string, boolean>): boolean {
   return kinds[kind] === false;
 }
 
-export function Nodes() {
-  const groups = useMemo(() => {
-    const map = new Map<string, number[]>();
-    NODES.forEach((n, i) => {
-      const k = KINDS.includes(n.kind as (typeof KINDS)[number]) ? n.kind : "Experience";
-      const list = map.get(k) ?? [];
-      list.push(i);
-      map.set(k, list);
-    });
-    return map;
-  }, []);
+const maxOther = Math.max(1, ...NODES.filter((n) => n.id !== "shreeraj").map((n) => DEGREE.get(n.id) || 1));
 
-  const meshes = useRef<(InstancedMesh | null)[]>([]);
+export function discRadius(id: string, degree: number): number {
+  if (id === "shreeraj") return 1.15;
+  const t = Math.sqrt(degree / maxOther);
+  return Math.min(0.72, 0.2 + t * 0.48);
+}
+
+const vert = /* glsl */ `
+  attribute float aScale;
+  attribute vec2 uvOff;
+  attribute vec3 aTint;
+  varying vec2 vUvOff;
+  varying vec3 vCol;
+  void main() {
+    vUvOff = uvOff;
+    vCol = aTint;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mv;
+    gl_PointSize = aScale * projectionMatrix[1][1] * 900.0 / max(0.2, -mv.z);
+  }
+`;
+
+const frag = /* glsl */ `
+  uniform sampler2D map;
+  uniform float cell;
+  varying vec2 vUvOff;
+  varying vec3 vCol;
+  void main() {
+    vec2 uv = vUvOff + vec2(gl_PointCoord.x, 1.0 - gl_PointCoord.y) * cell;
+    vec4 tex = texture2D(map, uv);
+    if (tex.a < 0.05) discard;
+    gl_FragColor = vec4(tex.rgb * vCol, tex.a);
+  }
+`;
+
+export function Nodes() {
+  const pointsRef = useRef<Points>(null);
   const shadowRef = useRef<InstancedMesh>(null);
-  const yaws = useMemo(() => NODES.map((n) => yawOf(n.id)), []);
-  const nodeStyle = useGraphStore((s) => s.nodeStyle);
+  const plumbRef = useRef<LineSegments>(null);
+  const atlas = useMemo(() => nodeAtlas(), []);
+  const geo = useMemo(() => {
+    const g = new BufferGeometry();
+    const pos = new Float32Array(NODES.length * 3);
+    const uv = atlas.uv;
+    const scale = new Float32Array(NODES.length);
+    const tint = new Float32Array(NODES.length * 3);
+    NODES.forEach((n, i) => {
+      const p = POSITIONS[n.id] ?? [0, 0, 0];
+      pos[i * 3] = p[0];
+      pos[i * 3 + 1] = p[1];
+      pos[i * 3 + 2] = p[2];
+      scale[i] = 0.4;
+      tint[i * 3] = 1;
+      tint[i * 3 + 1] = 1;
+      tint[i * 3 + 2] = 1;
+    });
+    g.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    g.setAttribute("uvOff", new Float32BufferAttribute(uv, 2));
+    g.setAttribute("aScale", new Float32BufferAttribute(scale, 1));
+    g.setAttribute("aTint", new Float32BufferAttribute(tint, 3));
+    return g;
+  }, [atlas]);
+  const mat = useMemo(
+    () =>
+      new ShaderMaterial({
+        uniforms: { map: { value: atlas.texture }, cell: { value: atlas.cell } },
+        vertexShader: vert,
+        fragmentShader: frag,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    [atlas],
+  );
+
+  const baseScale = useMemo(
+    () => NODES.map((n) => discRadius(n.id, DEGREE.get(n.id) || 1) * 2.15),
+    [],
+  );
+
   const hovered = useGraphStore((s) => s.hoveredId);
   const selected = useGraphStore((s) => s.selectedId);
   const communityFocus = useGraphStore((s) => s.communityFocus);
   const kinds = useGraphStore((s) => s.kinds);
   const introDone = useGraphStore((s) => s.introDone);
   const reduced = useGraphStore((s) => s.reducedMotion);
+  const introT = useRef(reduced ? 1 : 0);
 
   const neighborSet = useMemo(() => {
     const focus = hovered || selected;
@@ -115,7 +156,12 @@ export function Nodes() {
     return set;
   }, [hovered, selected]);
 
-  // Community spring targets.
+  const plumbGeo = useMemo(() => {
+    const g = new BufferGeometry();
+    g.setAttribute("position", new Float32BufferAttribute(new Float32Array(NODES.length * 6), 3));
+    return g;
+  }, []);
+
   useLayoutEffect(() => {
     if (communityFocus == null) {
       NODES.forEach((n, i) => {
@@ -132,8 +178,8 @@ export function Nodes() {
     NODES.forEach((n, i) => {
       if (n.community === communityFocus) members.push(i);
     });
-    const cx = members.reduce((a, i) => a + (POSITIONS[NODES[i].id]?.[0] ?? 0), 0) / Math.max(1, members.length);
-    const cz = members.reduce((a, i) => a + (POSITIONS[NODES[i].id]?.[2] ?? 0), 0) / Math.max(1, members.length);
+    const cx = members.reduce((a, i) => a + (POSITIONS[NODES[i]!.id]?.[0] ?? 0), 0) / Math.max(1, members.length);
+    const cz = members.reduce((a, i) => a + (POSITIONS[NODES[i]!.id]?.[2] ?? 0), 0) / Math.max(1, members.length);
     members.forEach((i, k) => {
       const ang = (k / members.length) * Math.PI * 2;
       const rad = 1.15 + (k % 5) * 0.18;
@@ -154,18 +200,6 @@ export function Nodes() {
     });
   }, [communityFocus]);
 
-  const colors = useMemo(() => NODES.map((n) => communityColor(n.community)), []);
-  const baseScale = useMemo(
-    () => NODES.map((n) => nodeRadius(DEGREE.get(n.id) || 1, MAX_DEGREE) / 0.18),
-    [],
-  );
-
-  const geos = useMemo(() => {
-    return NODES.map((n) => geometryForNode(n.id, n.kind, nodeStyle === "stamps"));
-  }, [nodeStyle]);
-
-  const introT = useRef(reduced ? 1 : 0);
-
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     if (!reduced && !introDone) introT.current = Math.min(1, introT.current + dt * 0.55);
@@ -173,7 +207,12 @@ export function Nodes() {
 
     const focusId = hovered || selected;
     const hasFocus = Boolean(focusId);
-    const kSpring = communityFocus == null ? 10 : 7;
+    const posAttr = geo.getAttribute("position") as Float32BufferAttribute;
+    const scaleAttr = geo.getAttribute("aScale") as Float32BufferAttribute;
+    const tintAttr = geo.getAttribute("aTint") as Float32BufferAttribute;
+    const posArr = posAttr.array as Float32Array;
+    const scaleArr = scaleAttr.array as Float32Array;
+    const tintArr = tintAttr.array as Float32Array;
 
     for (let i = 0; i < NODES.length; i++) {
       const n = NODES[i];
@@ -181,116 +220,81 @@ export function Nodes() {
       if (!n || !live) continue;
       const hidden = kindHidden(n.kind, kinds);
       hiddenFlags[i] = hidden ? 1 : 0;
-
       const dimCommunity = communityFocus != null && n.community !== communityFocus;
       const inRing = !hasFocus || neighborSet.has(i);
-      const targetScale = hidden ? 0.001 : inRing && !dimCommunity ? (neighborSet.has(i) && hasFocus ? 1.12 : 1) : 0.72;
-      const hoverBoost = hovered === n.id ? 1.15 : selected === n.id ? 1.08 : 1;
+      const targetScale = hidden ? 0.001 : inRing && !dimCommunity ? 1 : 0.62;
+      const hoverBoost = hovered === n.id || selected === n.id ? 1.08 : 1;
       live.ts = targetScale * hoverBoost;
-      live.s += (live.ts - live.s) * (1 - Math.exp(-dt * 14));
+      live.s += (live.ts - live.s) * (1 - Math.exp(-dt * 12));
+      const liftTarget = hovered === n.id || selected === n.id ? 0.55 : 0;
+      live.lift += (liftTarget - live.lift) * (1 - Math.exp(-dt * (reduced ? 40 : 8)));
+      live.x += (live.tx - live.x) * (1 - Math.exp(-dt * 8));
+      live.y += (live.ty - live.y) * (1 - Math.exp(-dt * 8));
+      live.z += (live.tz - live.z) * (1 - Math.exp(-dt * 8));
 
-      const liftTarget = hovered === n.id || selected === n.id ? 0.22 : 0;
-      live.lift += (liftTarget - live.lift) * (1 - Math.exp(-dt * 10));
-
-      live.x += (live.tx - live.x) * (1 - Math.exp(-dt * kSpring));
-      live.y += (live.ty - live.y) * (1 - Math.exp(-dt * kSpring));
-      live.z += (live.tz - live.z) * (1 - Math.exp(-dt * kSpring));
-    }
-
-    for (let i = 0; i < NODES.length; i++) {
-      const mesh = meshes.current[i];
-      if (!mesh) continue;
-      const n = NODES[i];
-      const live = livePositions[i];
-      if (!n || !live) continue;
-      const hidden = hiddenFlags[i] === 1;
-      const hasFocus = Boolean(hovered || selected);
-      const inRing = !hasFocus || neighborSet.has(i);
-      const dimCommunity = communityFocus != null && n.community !== communityFocus;
       let intro = 1;
       if (introT.current < 1 && n.id !== "shreeraj") {
-        const delay = (n.community / 13) * 0.45;
-        intro = Math.max(0, Math.min(1, (introT.current - delay) / 0.4));
+        const delay = (n.community / 13) * 0.35;
+        intro = Math.max(0, Math.min(1, (introT.current - delay) / 0.45));
       }
-      const sc = baseScale[i] * live.s * (hidden ? 0 : intro);
-      const yLift =
-        introT.current < 1 && n.id !== "shreeraj"
-          ? (intro - 1) * 1.4
-          : 0;
-      const size = Math.max(0.0001, sc * (nodeStyle === "stamps" ? 0.9 : 0.72));
-      dummy.position.set(live.x, live.y + live.lift + yLift + 0.02, live.z);
-      dummy.scale.setScalar(size);
-      dummy.rotation.set(0, yaws[i] ?? 0, 0);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(0, dummy.matrix);
-      mesh.instanceMatrix.needsUpdate = true;
-      const dim = hidden || (hasFocus && !inRing) || dimCommunity ? 0.28 : 1;
-      mesh.setColorAt(0, colorScratch.set(colors[i]).multiplyScalar(0.55 + 0.45 * dim));
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    }
+      const sc = (baseScale[i] ?? 0.4) * live.s * (hidden ? 0 : intro);
+      const y = live.y + live.lift + (introT.current < 1 && n.id !== "shreeraj" ? (intro - 1) * 0.8 : 0);
+      posArr[i * 3] = live.x;
+      posArr[i * 3 + 1] = y;
+      posArr[i * 3 + 2] = live.z;
+      scaleArr[i] = sc;
+      const dim = hidden || (hasFocus && !inRing) || dimCommunity ? 0.35 : 1;
+      tintArr[i * 3] = dim;
+      tintArr[i * 3 + 1] = dim;
+      tintArr[i * 3 + 2] = dim;
 
-    const shadow = shadowRef.current;
-    if (shadow) {
-      for (let i = 0; i < NODES.length; i++) {
-        const live = livePositions[i];
-        if (!live) continue;
-        const hidden = hiddenFlags[i] === 1;
-        const sc = (baseScale[i] ?? 1) * live.s;
-        dummy.position.set(live.x, 0.012, live.z);
+      const shadow = shadowRef.current;
+      if (shadow) {
+        const sh = hidden ? 0.0001 : Math.max(0.15, sc * 0.85 * (1 + live.lift));
+        dummy.position.set(live.x, 0.02, live.z);
         dummy.rotation.set(-Math.PI / 2, 0, 0);
-        const s = hidden ? 0.0001 : Math.max(0.12, sc * 0.28);
-        dummy.scale.set(s, s, s);
+        dummy.scale.set(sh, sh, 1);
         dummy.updateMatrix();
         shadow.setMatrixAt(i, dummy.matrix);
       }
-      shadow.instanceMatrix.needsUpdate = true;
+
+      const o = i * 6;
+      const plumb = plumbGeo.getAttribute("position") as Float32BufferAttribute;
+      const arr = plumb.array as Float32Array;
+      arr[o] = live.x;
+      arr[o + 1] = 0.03;
+      arr[o + 2] = live.z;
+      arr[o + 3] = live.x;
+      arr[o + 4] = Math.max(0.05, y - sc * 0.35);
+      arr[o + 5] = live.z;
     }
+    posAttr.needsUpdate = true;
+    scaleAttr.needsUpdate = true;
+    tintAttr.needsUpdate = true;
+    if (shadowRef.current) shadowRef.current.instanceMatrix.needsUpdate = true;
+    const plumb = plumbGeo.getAttribute("position") as Float32BufferAttribute;
+    plumb.needsUpdate = true;
+    plumbRef.current?.computeLineDistances();
   });
 
   return (
     <group>
-      {NODES.map((n, i) => (
-        <instancedMesh
-          key={n.id + nodeStyle}
-          ref={(el) => {
-            meshes.current[i] = el;
-          }}
-          args={[geos[i], undefined, 1]}
-          frustumCulled={false}
-          castShadow
-        >
-          <meshStandardMaterial roughness={0.86} metalness={0.02} />
-        </instancedMesh>
-      ))}
-      <instancedMesh
-        ref={shadowRef}
-        args={[undefined, undefined, NODES.length]}
-        frustumCulled={false}
-      >
-        <circleGeometry args={[0.42, 20]} />
-        <meshBasicMaterial color="#14191A" transparent opacity={0.12} depthWrite={false} />
+      <points ref={pointsRef} geometry={geo} material={mat} frustumCulled={false} renderOrder={2} />
+      <instancedMesh ref={shadowRef} args={[undefined, undefined, NODES.length]} frustumCulled={false}>
+        <circleGeometry args={[0.55, 20]} />
+        <meshBasicMaterial color="#3c2c1c" transparent opacity={0.22} depthWrite={false} />
       </instancedMesh>
-      <HitProxies />
+      <lineSegments ref={plumbRef} geometry={plumbGeo} frustumCulled={false}>
+        <lineDashedMaterial color="#7A6C58" transparent opacity={0.45} dashSize={0.12} gapSize={0.08} />
+      </lineSegments>
+      <HitProxies baseScale={baseScale} />
     </group>
   );
 }
 
-function HitProxies() {
+function HitProxies({ baseScale }: { baseScale: number[] }) {
   const ref = useRef<InstancedMesh>(null);
-  const geo = useMemo(() => new SphereGeometry(0.34, 8, 6), []);
-  useLayoutEffect(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    NODES.forEach((n, i) => {
-      const p = POSITIONS[n.id] ?? [0, 0, 0];
-      dummy.position.set(p[0], p[1] + 0.05, p[2]);
-      dummy.scale.setScalar(1);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-  }, []);
-
+  const geo = useMemo(() => new SphereGeometry(0.5, 8, 6), []);
   useFrame(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -298,14 +302,15 @@ function HitProxies() {
       const live = livePositions[i];
       if (!live) continue;
       const hidden = hiddenFlags[i] === 1;
-      dummy.position.set(live.x, live.y + live.lift + 0.05, live.z);
-      dummy.scale.setScalar(hidden ? 0.0001 : 1.15 * live.s);
+      dummy.position.set(live.x, live.y + live.lift, live.z);
+      const s = hidden ? 0.0001 : (baseScale[i] ?? 0.4) * live.s * 0.55;
+      dummy.scale.setScalar(s);
+      dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
   });
-
   return (
     <instancedMesh
       ref={ref}
@@ -337,4 +342,3 @@ function HitProxies() {
     </instancedMesh>
   );
 }
-

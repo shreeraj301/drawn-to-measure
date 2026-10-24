@@ -1,7 +1,6 @@
-import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import { ADJACENCY, LINKS, getNode, relationLabel } from "@/lib/graph/model";
 import { useGraphStore } from "@/state/store";
-import { KindIcon } from "./Icons";
+import { IconClose, IconLink, IconNext, IconPrev, KindIcon } from "./Icons";
 import { kindLabel } from "./SidePanel";
 
 export function DetailPanel() {
@@ -51,7 +50,7 @@ export function DetailPanel() {
         </div>
         <div className="sn-sheet-nav">
           <button type="button" onClick={back} disabled={historyIndex <= 0} aria-label="Previous selection">
-            <ChevronLeft />
+            <IconPrev />
           </button>
           <button
             type="button"
@@ -59,10 +58,10 @@ export function DetailPanel() {
             disabled={historyIndex >= history.length - 1}
             aria-label="Next selection"
           >
-            <ChevronRight />
+            <IconNext />
           </button>
           <button type="button" onClick={() => select(null, { push: false })} aria-label="Close detail">
-            <X />
+            <IconClose />
           </button>
         </div>
       </header>
@@ -79,7 +78,7 @@ export function DetailPanel() {
                 {s.url ? (
                   <a href={s.url} target="_blank" rel="noreferrer">
                     {s.label}
-                    <ExternalLink aria-hidden />
+                    <IconLink />
                   </a>
                 ) : (
                   <span>{s.label}</span>

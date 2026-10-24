@@ -1,23 +1,26 @@
-import {
-  AudioLines,
-  AudioWaveform,
-  Box,
-  Compass,
-  Filter,
-  HelpCircle,
-  Layers3,
-  Route,
-  Search,
-  Square,
-} from "lucide-react";
 import { useEffect, useState } from "react";
-import { useGraphStore, type CameraView, type NodeStyle } from "@/state/store";
+import { useGraphStore, type CameraView } from "@/state/store";
+import {
+  IconAxo,
+  IconElevation,
+  IconFilter,
+  IconHelp,
+  IconLayers,
+  IconNight,
+  IconPaper,
+  IconPerspective,
+  IconPlan,
+  IconRoute,
+  IconSearch,
+  IconSoundOff,
+  IconSoundOn,
+} from "./Icons";
 
-const VIEWS: { id: CameraView; label: string; hint: string; key: string; icon: typeof Square }[] = [
-  { id: "plan", label: "Plan", hint: "Top-down", key: "1", icon: Square },
-  { id: "elevation", label: "Elevation", hint: "Side view", key: "2", icon: Layers3 },
-  { id: "axonometric", label: "Axonometric", hint: "Angled", key: "3", icon: Box },
-  { id: "perspective", label: "Perspective", hint: "Camera", key: "4", icon: Compass },
+const VIEWS: { id: CameraView; label: string; hint: string; key: string; icon: typeof IconPlan }[] = [
+  { id: "plan", label: "Plan", hint: "Top-down", key: "1", icon: IconPlan },
+  { id: "elevation", label: "Elevation", hint: "Side view", key: "2", icon: IconElevation },
+  { id: "axonometric", label: "Axonometric", hint: "Angled", key: "3", icon: IconAxo },
+  { id: "perspective", label: "Perspective", hint: "Camera", key: "4", icon: IconPerspective },
 ];
 
 export function Toolbar() {
@@ -31,9 +34,9 @@ export function Toolbar() {
   const setHelp = useGraphStore((s) => s.setHelpOpen);
   const sound = useGraphStore((s) => s.soundOn);
   const setSound = useGraphStore((s) => s.setSoundOn);
+  const theme = useGraphStore((s) => s.theme);
+  const setTheme = useGraphStore((s) => s.setTheme);
   const mobile = useGraphStore((s) => s.mobile);
-  const nodeStyle = useGraphStore((s) => s.nodeStyle);
-  const setNodeStyle = useGraphStore((s) => s.setNodeStyle);
   const [flying, setFlying] = useState(false);
 
   useEffect(() => {
@@ -77,34 +80,34 @@ export function Toolbar() {
       </nav>
       <div className="sn-toolbar-actions">
         <button type="button" aria-pressed={paletteOpen} onClick={() => setPalette(!paletteOpen)} aria-keyshortcuts="/ Meta+K">
-          <Search aria-hidden />
+          <IconSearch />
           <span>Search</span>
         </button>
         <button type="button" aria-pressed={sideTab === "filters"} onClick={() => toggle("filters")}>
-          <Filter aria-hidden />
+          <IconFilter />
           <span>Filters</span>
         </button>
         <button type="button" aria-pressed={sideTab === "communities"} onClick={() => toggle("communities")}>
-          <Layers3 aria-hidden />
+          <IconLayers />
           <span>Communities</span>
         </button>
         <button type="button" aria-pressed={sideTab === "tours"} onClick={() => toggle("tours")}>
-          <Route aria-hidden />
+          <IconRoute />
           <span>Tours</span>
         </button>
         <button
           type="button"
-          aria-pressed={nodeStyle === "stamps"}
-          onClick={() => setNodeStyle(nodeStyle === "instruments" ? "stamps" : "instruments")}
-          title={nodeStyle === "instruments" ? "Flat stamps" : "Standing instruments"}
+          aria-pressed={theme === "night"}
+          onClick={() => setTheme(theme === "night" ? "paper" : "night")}
         >
-          <span>{nodeStyle === "instruments" ? "Instruments" : "Stamps"}</span>
+          {theme === "night" ? <IconPaper /> : <IconNight />}
+          <span>{theme === "night" ? "Paper" : "Night"}</span>
         </button>
         <button type="button" aria-pressed={helpOpen} onClick={() => setHelp(!helpOpen)} aria-label="Keyboard guide">
-          <HelpCircle aria-hidden />
+          <IconHelp />
         </button>
         <button type="button" aria-pressed={sound} onClick={() => setSound(!sound)} aria-label={sound ? "Sound on" : "Sound off"}>
-          {sound ? <AudioLines aria-hidden /> : <AudioWaveform aria-hidden />}
+          {sound ? <IconSoundOn /> : <IconSoundOff />}
         </button>
         {!mobile ? (
           <span className="sn-fly-hint" data-on={flying ? "1" : "0"} title="Move through the sheet">

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search } from "lucide-react";
 import { searchNodes } from "@/lib/graph/search";
 import { useGraphStore } from "@/state/store";
-import { KindIcon } from "./Icons";
+import { IconSearch, KindIcon } from "./Icons";
 import { kindLabel } from "./SidePanel";
 
 export function CommandPalette() {
@@ -39,7 +38,7 @@ export function CommandPalette() {
   return (
     <div className="sn-search" role="dialog" aria-label="Search the graph">
       <label className="sn-search-field">
-        <Search aria-hidden />
+        <IconSearch />
         <input
           ref={input}
           value={q}

@@ -1,7 +1,7 @@
 import { TOURS, tourById } from "@/lib/graph/tours";
 import { getNode } from "@/lib/graph/model";
 import { useGraphStore } from "@/state/store";
-import { Pause, Play, X } from "lucide-react";
+import { IconClose, IconPause, IconPlay } from "./Icons";
 
 export function ToursMenu() {
   return null;
@@ -38,7 +38,7 @@ export function TourCaption() {
           Back
         </button>
         <button type="button" onClick={() => setPlaying(!playing)} aria-pressed={playing}>
-          {playing ? <Pause /> : <Play />}
+          {playing ? <IconPause /> : <IconPlay />}
           {playing ? "Pause" : "Play"}
         </button>
         <button
@@ -49,7 +49,7 @@ export function TourCaption() {
           Next
         </button>
         <button type="button" onClick={stop} aria-label="End tour">
-          <X />
+          <IconClose />
         </button>
       </div>
     </div>

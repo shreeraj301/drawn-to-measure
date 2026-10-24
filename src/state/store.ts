@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { KINDS } from "@/lib/graph/model";
 
+export type ThemeName = "paper" | "night";
 export type NodeStyle = "instruments" | "stamps";
 
 export type CameraView = "perspective" | "plan" | "elevation" | "axonometric";
@@ -48,6 +49,8 @@ type GraphState = {
 
   soundOn: boolean;
   mobile: boolean;
+  theme: ThemeName;
+  /** Kept so older hash readers do not crash. The discs replaced these shapes. */
   nodeStyle: NodeStyle;
   /** Bumps while community springs are sliding, so edges can follow. */
   motionTick: number;
@@ -85,6 +88,7 @@ type GraphState = {
 
   setSoundOn: (v: boolean) => void;
   setMobile: (v: boolean) => void;
+  setTheme: (v: ThemeName) => void;
   setNodeStyle: (v: NodeStyle) => void;
   bumpMotion: () => void;
 
@@ -129,6 +133,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   soundOn: false,
   mobile: false,
+  theme: "paper",
   nodeStyle: "instruments",
   motionTick: 0,
   lastActivity: 0,
@@ -234,6 +239,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   setSoundOn: (v) => set({ soundOn: v }),
   setMobile: (v) => set({ mobile: v }),
+  setTheme: (v) => set({ theme: v }),
   setNodeStyle: (v) => set({ nodeStyle: v }),
   bumpMotion: () => set((s) => ({ motionTick: (s.motionTick + 1) % 100000 })),
   touchActivity: () => set({ idle: false, lastActivity: performance.now() }),

@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { Line } from "@react-three/drei";
 import { HYPEREDGES, POSITIONS } from "@/lib/graph/model";
-import { PATINA, REDLINE } from "@/lib/graph/colors";
+import { GRAPHITE } from "@/lib/graph/colors";
 import { livePositions, indexOf } from "./Nodes";
 import { useGraphStore } from "@/state/store";
 
-const HULL_COLORS = [PATINA, "#8A5A12", REDLINE];
+const HULL_COLORS = [GRAPHITE, GRAPHITE, GRAPHITE];
 
 /** Dotted loop around each hyperedge, drawn just above the sheet. */
 export function Hulls() {

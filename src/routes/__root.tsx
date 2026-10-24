@@ -15,7 +15,7 @@ export const Route = createRootRoute({
         name: "description",
         content: "A three dimensional drawing of Shreeraj Narwade: architecture, poems, tools, and the turn toward HCI.",
       },
-      { name: "theme-color", content: "#F3F4F1" },
+      { name: "theme-color", content: "#E9E0CF" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

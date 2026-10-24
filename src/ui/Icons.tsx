@@ -1,4 +1,5 @@
 /** Small ink marks that match the instruments on the sheet. */
+import type { ReactNode } from "react";
 
 export function KindIcon({ kind, className }: { kind: string; className?: string }) {
   return (
@@ -112,3 +113,161 @@ function Mark({ kind }: { kind: string }) {
       );
   }
 }
+
+const ink = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.6,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+function Glyph({ children }: { children: ReactNode }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      {children}
+    </svg>
+  );
+}
+
+export function IconPlan() {
+  return (
+    <Glyph>
+      <rect x="4" y="4" width="16" height="16" {...ink} />
+    </Glyph>
+  );
+}
+export function IconElevation() {
+  return (
+    <Glyph>
+      <path d="M4 18V7M4 18h16M8 18V11M12 18V8M16 18V13" {...ink} />
+    </Glyph>
+  );
+}
+export function IconAxo() {
+  return (
+    <Glyph>
+      <path d="M12 4l8 4.5v7L12 20l-8-4.5v-7zM12 12l8-3.5M12 12v8M12 12L4 8.5" {...ink} />
+    </Glyph>
+  );
+}
+export function IconPerspective() {
+  return (
+    <Glyph>
+      <path d="M4 16l8-10 8 10M8 16l4-5 4 5" {...ink} />
+    </Glyph>
+  );
+}
+export function IconSearch() {
+  return (
+    <Glyph>
+      <circle cx="11" cy="11" r="5.2" {...ink} />
+      <path d="M15.2 15.2L20 20" {...ink} />
+    </Glyph>
+  );
+}
+export function IconFilter() {
+  return (
+    <Glyph>
+      <path d="M4 6h16M7 12h10M10 18h4" {...ink} />
+    </Glyph>
+  );
+}
+export function IconLayers() {
+  return (
+    <Glyph>
+      <path d="M4 8l8-4 8 4-8 4zM4 13l8 4 8-4" {...ink} />
+    </Glyph>
+  );
+}
+export function IconRoute() {
+  return (
+    <Glyph>
+      <circle cx="6" cy="7" r="2" {...ink} />
+      <circle cx="18" cy="17" r="2" {...ink} />
+      <path d="M8 8c4 0 4 8 8 8" {...ink} />
+    </Glyph>
+  );
+}
+export function IconHelp() {
+  return (
+    <Glyph>
+      <circle cx="12" cy="12" r="8" {...ink} />
+      <path d="M9.5 9.5a2.5 2.5 0 114 2c-.8.6-1.5 1-1.5 2.2" {...ink} />
+    </Glyph>
+  );
+}
+export function IconSoundOn() {
+  return (
+    <Glyph>
+      <path d="M5 10h3l4-3v10l-4-3H5zM16 9.5a4 4 0 010 5" {...ink} />
+    </Glyph>
+  );
+}
+export function IconSoundOff() {
+  return (
+    <Glyph>
+      <path d="M5 10h3l4-3v10l-4-3H5zM16 10l4 4M20 10l-4 4" {...ink} />
+    </Glyph>
+  );
+}
+export function IconClose() {
+  return (
+    <Glyph>
+      <path d="M6 6l12 12M18 6L6 18" {...ink} />
+    </Glyph>
+  );
+}
+export function IconPlay() {
+  return (
+    <Glyph>
+      <path d="M8 6l11 6-11 6z" {...ink} />
+    </Glyph>
+  );
+}
+export function IconPause() {
+  return (
+    <Glyph>
+      <path d="M8 6v12M16 6v12" {...ink} />
+    </Glyph>
+  );
+}
+export function IconPrev() {
+  return (
+    <Glyph>
+      <path d="M15 6l-7 6 7 6" {...ink} />
+    </Glyph>
+  );
+}
+export function IconNext() {
+  return (
+    <Glyph>
+      <path d="M9 6l7 6-7 6" {...ink} />
+    </Glyph>
+  );
+}
+export function IconNight() {
+  return (
+    <Glyph>
+      <path d="M14 4.5A7 7 0 1019 16 5.5 5.5 0 0114 4.5z" {...ink} />
+    </Glyph>
+  );
+}
+export function IconPaper() {
+  return (
+    <Glyph>
+      <circle cx="12" cy="12" r="4" {...ink} />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" {...ink} />
+    </Glyph>
+  );
+}
+
+export function IconLink() {
+  return (
+    <Glyph>
+      <path d="M10 14a4 4 0 01-1-6l2-2M14 10a4 4 0 011 6l-2 2M9 15l6-6" {...ink} />
+    </Glyph>
+  );
+}
+
+
