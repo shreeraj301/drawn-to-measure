@@ -1,10 +1,28 @@
 import { CanvasTexture, SRGBColorSpace } from "three";
-import { COBALT, COBALT_WASH, INK, communityWash } from "@/lib/graph/colors";
+import { COBALT_WASH, INK, communityWash } from "@/lib/graph/colors";
 import { DEGREE, NODES } from "@/lib/graph/model";
 
 const CELL = 128;
 const COLS = 16;
 const SIZE = COLS * CELL;
+
+const MAX_OTHER = Math.max(1, ...NODES.filter((n) => n.id !== "shreeraj").map((n) => DEGREE.get(n.id) || 0));
+const HUB_DEG = new Map<number, number>();
+for (const n of NODES) {
+  if (n.id === "shreeraj") continue;
+  const d = DEGREE.get(n.id) || 0;
+  HUB_DEG.set(n.community, Math.max(HUB_DEG.get(n.community) || 0, d));
+}
+
+/** Ring radius as a fraction of the point sprite (cell is 128, ring uses this * 64). */
+export function discFrac(id: string, community: number): number {
+  if (id === "shreeraj") return 36 / 64;
+  const degree = DEGREE.get(id) || 0;
+  const isHub = degree > 0 && degree === (HUB_DEG.get(community) || 0);
+  if (isHub) return 34 / 64;
+  if (degree / MAX_OTHER > 0.18) return 28 / 64;
+  return 22 / 64;
+}
 
 function hash(id: string): number {
   let h = 2166136261;
@@ -69,21 +87,21 @@ function ring(
   col: string,
   seed: number,
   rnd: () => number,
-  passes = 2,
-  w: [number, number] = [1.3, 2.8],
+  passes = 1,
+  w: [number, number] = [1.15, 2.05],
 ) {
   for (let k = 0; k < passes; k++) {
     const st = rnd() * 6.28;
-    const ov = 0.25 + rnd() * 0.25;
-    const ox = (rnd() - 0.5) * 2;
-    const oy = (rnd() - 0.5) * 2;
+    const ov = 0.18 + rnd() * 0.16;
+    const ox = (rnd() - 0.5) * 1.4;
+    const oy = (rnd() - 0.5) * 1.4;
     const pts: number[][] = [];
     for (let i = 0; i <= 72; i++) {
       const t = st + (Math.PI * 2 + ov) * (i / 72);
-      const r = R * (1 + 0.03 * wob(t, seed + k)) + (i / 72) * (rnd() - 0.5) * 2;
+      const r = R * (1 + 0.028 * wob(t, seed + k)) + (i / 72) * (rnd() - 0.5) * 1.4;
       pts.push([x + ox + Math.cos(t) * r, y + oy + Math.sin(t) * r]);
     }
-    inkStroke(g, pts, col, w[0], w[1], rnd, k ? 0.5 : 0.92);
+    inkStroke(g, pts, col, w[0], w[1], rnd, 0.92);
   }
 }
 
@@ -100,43 +118,6 @@ function wash(g: CanvasRenderingContext2D, x: number, y: number, R: number, col:
     g.arc(cx, cy, r, 0, Math.PI * 2);
     g.fill();
   }
-}
-
-function glyph(g: CanvasRenderingContext2D, kind: string, x: number, y: number, s: number) {
-  g.save();
-  g.strokeStyle = INK;
-  g.fillStyle = INK;
-  g.lineWidth = 1.4;
-  g.lineCap = "round";
-  g.beginPath();
-  if (kind === "Project") g.strokeRect(x - s, y - s * 0.7, s * 2, s * 1.4);
-  else if (kind === "Place") {
-    g.moveTo(x, y - s);
-    g.lineTo(x + s, y + s * 0.8);
-    g.lineTo(x - s, y + s * 0.8);
-    g.closePath();
-    g.stroke();
-  } else if (kind === "Poem/Writing") {
-    g.moveTo(x - s, y);
-    g.bezierCurveTo(x - s * 0.3, y - s, x + s * 0.3, y + s, x + s, y);
-    g.stroke();
-  } else if (kind === "Person") {
-    g.arc(x, y - s * 0.35, s * 0.38, 0, Math.PI * 2);
-    g.moveTo(x, y);
-    g.lineTo(x, y + s);
-    g.stroke();
-  } else if (kind === "Skill/Tool") {
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      g.moveTo(x, y);
-      g.lineTo(x + Math.cos(a) * s, y + Math.sin(a) * s);
-    }
-    g.stroke();
-  } else {
-    g.arc(x, y, s * 0.45, 0, Math.PI * 2);
-    g.stroke();
-  }
-  g.restore();
 }
 
 export type Atlas = {
@@ -156,13 +137,6 @@ export function nodeAtlas(): Atlas {
   if (!g) throw new Error("canvas");
   g.clearRect(0, 0, SIZE, SIZE);
 
-  const maxOther = Math.max(1, ...NODES.filter((n) => n.id !== "shreeraj").map((n) => DEGREE.get(n.id) || 0));
-  const hub = new Map<number, number>();
-  for (const n of NODES) {
-    const d = DEGREE.get(n.id) || 0;
-    hub.set(n.community, Math.max(hub.get(n.community) || 0, n.id === "shreeraj" ? 0 : d));
-  }
-
   const uv = new Float32Array(NODES.length * 2);
   NODES.forEach((n, i) => {
     const col = i % COLS;
@@ -175,29 +149,9 @@ export function nodeAtlas(): Atlas {
     const cy = y0 + CELL / 2;
     const rnd = rng(hash(n.id));
     const him = n.id === "shreeraj";
-    const degree = DEGREE.get(n.id) || 0;
-    const isHub = !him && degree > 0 && degree === (hub.get(n.community) || 0);
-    const R = him ? 46 : isHub ? 34 : degree / maxOther > 0.18 ? 28 : 22;
-    wash(g, cx, cy, R * 0.95, him ? COBALT_WASH : communityWash(n.community), him ? 0.5 : 0.42, rnd);
-    ring(g, cx, cy, R, him ? COBALT : INK, hash(n.id) % 20, rnd, 2, him ? [2.2, 4.2] : [1.2, 2.6]);
-    if (isHub) {
-      g.strokeStyle = INK;
-      g.lineWidth = 1.2;
-      for (const a of [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2]) {
-        g.beginPath();
-        g.moveTo(cx + Math.cos(a) * (R + 2), cy + Math.sin(a) * (R + 2));
-        g.lineTo(cx + Math.cos(a) * (R + 8), cy + Math.sin(a) * (R + 8));
-        g.stroke();
-      }
-    } else if (degree / maxOther <= 0.18 && !him) {
-      ring(g, cx, cy, R * 0.62, INK, 3, rnd, 1, [0.8, 1.4]);
-    } else if (!him) {
-      g.fillStyle = INK;
-      g.beginPath();
-      g.arc(cx, cy, 3.2, 0, Math.PI * 2);
-      g.fill();
-    }
-    if (!him && (isHub || degree / maxOther > 0.18)) glyph(g, n.kind, cx, cy, 8);
+    const R = discFrac(n.id, n.community) * 64;
+    wash(g, cx, cy, R * 0.92, him ? COBALT_WASH : communityWash(n.community), him ? 0.34 : 0.4, rnd);
+    ring(g, cx, cy, R, INK, hash(n.id) % 20, rnd, 1, [1.15, 2.05]);
   });
 
   const texture = new CanvasTexture(canvas);

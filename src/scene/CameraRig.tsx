@@ -6,6 +6,7 @@ import { MathUtils, Spherical, Vector3 } from "three";
 import { useGraphStore, type CameraView } from "@/state/store";
 import { LAYOUT_RADIUS, neighborsOf } from "@/lib/graph/model";
 import { indexOf, nodeWorld } from "./Nodes";
+import { GRAPH_SCALE } from "./scale";
 
 const _spherical = new Spherical();
 const _offset = new Vector3();
@@ -42,7 +43,7 @@ function frameFor(ids: string[], view: CameraView): { pos: Vector3; target: Vect
     const i = indexOf(id);
     if (i < 0) continue;
     const p = nodeWorld(i);
-    pts.push(new Vector3(p[0], p[1], p[2]));
+    pts.push(new Vector3(p[0] * GRAPH_SCALE, p[1] * GRAPH_SCALE, p[2] * GRAPH_SCALE));
   }
   if (pts.length === 0) pts.push(new Vector3());
   const target = new Vector3();
@@ -61,13 +62,16 @@ function frameFor(ids: string[], view: CameraView): { pos: Vector3; target: Vect
   return { pos: new Vector3(target.x + dist * 0.72, target.y + dist * 0.48, target.z + dist * 0.72), target };
 }
 
-function overview(view: CameraView): { pos: Vector3; target: Vector3 } {
-  const target = new Vector3(0, 0, 0);
-  const d = Math.max(14, LAYOUT_RADIUS * 0.95);
-  if (view === "plan") return { pos: new Vector3(0, d * 1.55, 0.02), target };
-  if (view === "elevation") return { pos: new Vector3(0, d * 0.22, d * 1.35), target };
-  if (view === "axonometric") return { pos: new Vector3(d, d * 0.92, d), target };
-  return { pos: new Vector3(d * 0.55, d * 0.42, d * 0.72), target };
+function overview(view: CameraView, mobile = false): { pos: Vector3; target: Vector3 } {
+  const target = new Vector3(0, 1.5, 0);
+  const pull = mobile && view === "perspective" ? 1.32 : 1;
+  if (view === "plan") return { pos: new Vector3(0, Math.max(28, LAYOUT_RADIUS * GRAPH_SCALE * 3.4), 0.4), target };
+  if (view === "elevation") return { pos: new Vector3(0.2, 4, Math.max(26, LAYOUT_RADIUS * GRAPH_SCALE * 3.1)), target };
+  if (view === "axonometric") {
+    const s = Math.max(18, LAYOUT_RADIUS * GRAPH_SCALE * 2.15);
+    return { pos: new Vector3(s, s * 0.85, s), target };
+  }
+  return { pos: new Vector3(14 * pull, 1.5 + 7.5 * pull, 22 * pull), target };
 }
 
 export function CameraRig() {
@@ -76,7 +80,6 @@ export function CameraRig() {
   const focus = useGraphStore((s) => s.focus);
   const view = useGraphStore((s) => s.view);
   const reduced = useGraphStore((s) => s.reducedMotion);
-  const introDone = useGraphStore((s) => s.introDone);
   const idle = useGraphStore((s) => s.idle);
   const mobile = useGraphStore((s) => s.mobile);
   const setIdle = useGraphStore((s) => s.setIdle);
@@ -135,15 +138,15 @@ export function CameraRig() {
 
   useEffect(() => {
     const reducedNow = useGraphStore.getState().reducedMotion;
-    const intro = useGraphStore.getState().introDone;
+    const mobileNow = useGraphStore.getState().mobile;
     const nodeId = focus.nodeId;
     let ids: string[] = [];
     if (nodeId) {
       ids = focus.frameIds && focus.frameIds.length ? focus.frameIds : [nodeId, ...neighborsOf(nodeId)];
     }
-    const shot = !intro && !nodeId ? { pos: new Vector3(0, 26, 0.4), target: new Vector3(0, 0, 0) } : ids.length ? frameFor(ids, view) : overview(view);
+    const shot = ids.length ? frameFor(ids, view) : overview(view, mobileNow);
     const ctrl = controls.current;
-    const curTarget = ctrl ? ctrl.target.clone() : new Vector3();
+    const curTarget = ctrl ? ctrl.target.clone() : new Vector3(0, 1.5, 0);
     if (reducedNow) {
       camera.position.copy(shot.pos);
       if (ctrl) {
@@ -153,15 +156,18 @@ export function CameraRig() {
       flight.active = false;
       return;
     }
-    const leavingPlan = camera.position.y > 16 && Math.hypot(camera.position.x, camera.position.z) < 6;
+    if (camera.position.distanceTo(shot.pos) < 0.05 && curTarget.distanceTo(shot.target) < 0.05) {
+      flight.active = false;
+      return;
+    }
     flight.fromPos.copy(camera.position);
     flight.fromTarget.copy(curTarget);
     flight.toPos.copy(shot.pos);
     flight.toTarget.copy(shot.target);
     flight.t = 0;
-    flight.duration = leavingPlan ? 2.8 : 0.9;
+    flight.duration = 0.9;
     flight.active = true;
-  }, [focus, view, camera, introDone]);
+  }, [focus, view, camera, mobile]);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -183,7 +189,7 @@ export function CameraRig() {
       pitch.current = MathUtils.clamp(pitch.current - look.dy, -1.2, 1.2);
       look.dx = 0;
       look.dy = 0;
-      const speed = (keys.current.has("ShiftLeft") || keys.current.has("ShiftRight") ? 9 : 4.2) * dt;
+      const speed = (keys.current.has("ShiftLeft") || keys.current.has("ShiftRight") ? 9 : 4.2) * GRAPH_SCALE * dt;
       const forward = new Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current));
       const right = new Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current));
       const move = new Vector3();
@@ -260,11 +266,12 @@ export function CameraRig() {
     <OrbitControls
       ref={controls}
       makeDefault
+      target={[0, 1.5, 0]}
       enableDamping
       dampingFactor={0.12}
       zoomToCursor
-      maxDistance={70}
-      minDistance={1.2}
+      maxDistance={80}
+      minDistance={0.8}
       maxPolarAngle={orthoBlend ? Math.PI * 0.92 : Math.PI * 0.49}
       enablePan
       screenSpacePanning

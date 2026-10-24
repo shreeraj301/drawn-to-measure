@@ -239,7 +239,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   setSoundOn: (v) => set({ soundOn: v }),
   setMobile: (v) => set({ mobile: v }),
-  setTheme: (v) => set({ theme: v }),
+  setTheme: () => set({ theme: "paper" }),
   setNodeStyle: (v) => set({ nodeStyle: v }),
   bumpMotion: () => set((s) => ({ motionTick: (s.motionTick + 1) % 100000 })),
   touchActivity: () => set({ idle: false, lastActivity: performance.now() }),

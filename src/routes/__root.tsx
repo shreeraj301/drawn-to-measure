@@ -16,6 +16,7 @@ export const Route = createRootRoute({
         content: "A three dimensional drawing of Shreeraj Narwade: architecture, poems, tools, and the turn toward HCI.",
       },
       { name: "theme-color", content: "#E9E0CF" },
+      { name: "color-scheme", content: "light" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -25,7 +26,7 @@ export const Route = createRootRoute({
     ],
   }),
   component: () => (
-    <html lang="en" className="antialiased" suppressHydrationWarning>
+    <html lang="en" data-theme="paper" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

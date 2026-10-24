@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGraphStore, type CameraView } from "@/state/store";
 import {
   IconAxo,
@@ -6,8 +6,7 @@ import {
   IconFilter,
   IconHelp,
   IconLayers,
-  IconNight,
-  IconPaper,
+  IconMenu,
   IconPerspective,
   IconPlan,
   IconRoute,
@@ -34,10 +33,11 @@ export function Toolbar() {
   const setHelp = useGraphStore((s) => s.setHelpOpen);
   const sound = useGraphStore((s) => s.soundOn);
   const setSound = useGraphStore((s) => s.setSoundOn);
-  const theme = useGraphStore((s) => s.theme);
-  const setTheme = useGraphStore((s) => s.setTheme);
   const mobile = useGraphStore((s) => s.mobile);
+  const startTour = useGraphStore((s) => s.startTour);
   const [flying, setFlying] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onFly = (e: Event) => setFlying(Boolean((e as CustomEvent<boolean>).detail));
@@ -45,8 +45,33 @@ export function Toolbar() {
     return () => window.removeEventListener("sn-fly", onFly);
   }, []);
 
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const el = toolsRef.current;
+      if (el && e.target instanceof Node && el.contains(e.target)) return;
+      setToolsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setToolsOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [toolsOpen]);
+
   const toggle = (tab: "filters" | "communities" | "tours") => {
     setSideTab(sideTab === tab ? null : tab);
+    setToolsOpen(false);
+  };
+
+  const takeTour = () => {
+    useGraphStore.getState().setIntroDone(true);
+    startTour("pivot");
+    setToolsOpen(false);
   };
 
   return (
@@ -71,49 +96,79 @@ export function Toolbar() {
               title={v.hint}
               onClick={() => setView(v.id)}
             >
-              <Icon aria-hidden />
+              <Icon />
               <span>{v.label}</span>
               <kbd>{v.key}</kbd>
             </button>
           );
         })}
       </nav>
-      <div className="sn-toolbar-actions">
-        <button type="button" aria-pressed={paletteOpen} onClick={() => setPalette(!paletteOpen)} aria-keyshortcuts="/ Meta+K">
-          <IconSearch />
-          <span>Search</span>
+      <div className="sn-toolbar-end">
+        <button type="button" className="sn-tour-go" onClick={takeTour}>
+          Take the tour
         </button>
-        <button type="button" aria-pressed={sideTab === "filters"} onClick={() => toggle("filters")}>
-          <IconFilter />
-          <span>Filters</span>
-        </button>
-        <button type="button" aria-pressed={sideTab === "communities"} onClick={() => toggle("communities")}>
-          <IconLayers />
-          <span>Communities</span>
-        </button>
-        <button type="button" aria-pressed={sideTab === "tours"} onClick={() => toggle("tours")}>
-          <IconRoute />
-          <span>Tours</span>
-        </button>
-        <button
-          type="button"
-          aria-pressed={theme === "night"}
-          onClick={() => setTheme(theme === "night" ? "paper" : "night")}
-        >
-          {theme === "night" ? <IconPaper /> : <IconNight />}
-          <span>{theme === "night" ? "Paper" : "Night"}</span>
-        </button>
-        <button type="button" aria-pressed={helpOpen} onClick={() => setHelp(!helpOpen)} aria-label="Keyboard guide">
-          <IconHelp />
-        </button>
-        <button type="button" aria-pressed={sound} onClick={() => setSound(!sound)} aria-label={sound ? "Sound on" : "Sound off"}>
-          {sound ? <IconSoundOn /> : <IconSoundOff />}
-        </button>
-        {!mobile ? (
-          <span className="sn-fly-hint" data-on={flying ? "1" : "0"} title="Move through the sheet">
-            {flying ? "Fly: WASD, Shift, Esc" : "F to fly through the sheet"}
-          </span>
-        ) : null}
+        <div className="sn-tools" ref={toolsRef}>
+          <button
+            type="button"
+            aria-expanded={toolsOpen}
+            aria-haspopup="menu"
+            aria-label="Drawing tools"
+            onClick={() => setToolsOpen((v) => !v)}
+          >
+            <IconMenu />
+            <span className="sn-tools-label">Drawing tools</span>
+          </button>
+          {toolsOpen ? (
+            <div className="sn-tools-menu" role="menu">
+              {mobile
+                ? VIEWS.map((v) => {
+                    const Icon = v.icon;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="menuitem"
+                        aria-pressed={view === v.id}
+                        onClick={() => {
+                          setView(v.id);
+                          setToolsOpen(false);
+                        }}
+                      >
+                        <Icon />
+                        <span>{v.label}</span>
+                        <kbd>{v.key}</kbd>
+                      </button>
+                    );
+                  })
+                : null}
+              <button type="button" role="menuitem" aria-pressed={paletteOpen} onClick={() => { setPalette(!paletteOpen); setToolsOpen(false); }}>
+                <IconSearch />
+                <span>Search</span>
+              </button>
+              <button type="button" role="menuitem" aria-pressed={sideTab === "filters"} onClick={() => toggle("filters")}>
+                <IconFilter />
+                <span>Filters</span>
+              </button>
+              <button type="button" role="menuitem" aria-pressed={sideTab === "communities"} onClick={() => toggle("communities")}>
+                <IconLayers />
+                <span>Communities</span>
+              </button>
+              <button type="button" role="menuitem" aria-pressed={sideTab === "tours"} onClick={() => toggle("tours")}>
+                <IconRoute />
+                <span>Tours</span>
+              </button>
+              <button type="button" role="menuitem" aria-pressed={helpOpen} onClick={() => { setHelp(!helpOpen); setToolsOpen(false); }}>
+                <IconHelp />
+                <span>Keyboard guide</span>
+              </button>
+              <button type="button" role="menuitem" aria-pressed={sound} onClick={() => setSound(!sound)}>
+                {sound ? <IconSoundOn /> : <IconSoundOff />}
+                <span>{sound ? "Sound on" : "Sound off"}</span>
+              </button>
+              <p className="sn-tools-note">{flying ? "Fly: WASD, Shift, Esc" : mobile ? "Drag to orbit the sheet" : "F to fly through the sheet"}</p>
+            </div>
+          ) : null}
+        </div>
       </div>
     </header>
   );

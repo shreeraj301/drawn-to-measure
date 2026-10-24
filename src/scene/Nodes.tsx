@@ -1,5 +1,5 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import {
   type InstancedMesh,
   Object3D,
@@ -7,14 +7,22 @@ import {
   SphereGeometry,
   BufferGeometry,
   Float32BufferAttribute,
+  CanvasTexture,
+  SRGBColorSpace,
   Points,
   LineSegments,
+  Vector3,
+  Quaternion,
 } from "three";
 import { DEGREE, LINKS, NODES, POSITIONS } from "@/lib/graph/model";
 import { useGraphStore } from "@/state/store";
-import { nodeAtlas } from "./atlas";
+import { discFrac, nodeAtlas } from "./atlas";
+import { GRAPH_SCALE } from "./scale";
 
 const dummy = new Object3D();
+const _right = new Vector3();
+const _up = new Vector3();
+const _q = new Quaternion();
 
 type Live = {
   x: number;
@@ -28,9 +36,27 @@ type Live = {
   lift: number;
 };
 
+const maxOther = Math.max(1, ...NODES.filter((n) => n.id !== "shreeraj").map((n) => DEGREE.get(n.id) || 1));
+
+export function discRadius(id: string, degree: number): number {
+  if (id === "shreeraj") return 1.15;
+  const t = Math.sqrt(degree / maxOther);
+  return Math.min(0.72, 0.2 + t * 0.48);
+}
+
+/** Local-space radius of the painted disc (before the scene scale). */
+export function localDiscRadius(id: string, degree: number, community: number): number {
+  return discRadius(id, degree) * 2.15 * discFrac(id, community);
+}
+
+const HIM_LOCAL_R = localDiscRadius("shreeraj", 1, 0);
+/** Clear the sheet by 0.2 world units once GRAPH_SCALE is applied. */
+export const HIM_Y = HIM_LOCAL_R + 0.2 / GRAPH_SCALE;
+
 export const livePositions: Live[] = NODES.map((n) => {
   const p = POSITIONS[n.id] ?? [0, 0, 0];
-  return { x: p[0], y: p[1], z: p[2], tx: p[0], ty: p[1], tz: p[2], s: 1, ts: 1, lift: 0 };
+  const y = n.id === "shreeraj" ? HIM_Y : p[1];
+  return { x: p[0], y, z: p[2], tx: p[0], ty: y, tz: p[2], s: 1, ts: 1, lift: 0 };
 });
 
 export function nodeWorld(index: number): [number, number, number] {
@@ -49,12 +75,8 @@ function kindHidden(kind: string, kinds: Record<string, boolean>): boolean {
   return kinds[kind] === false;
 }
 
-const maxOther = Math.max(1, ...NODES.filter((n) => n.id !== "shreeraj").map((n) => DEGREE.get(n.id) || 1));
-
-export function discRadius(id: string, degree: number): number {
-  if (id === "shreeraj") return 1.15;
-  const t = Math.sqrt(degree / maxOther);
-  return Math.min(0.72, 0.2 + t * 0.48);
+function placeY(id: string, y: number): number {
+  return id === "shreeraj" ? Math.max(y, HIM_Y) : y;
 }
 
 const vert = /* glsl */ `
@@ -85,11 +107,33 @@ const frag = /* glsl */ `
   }
 `;
 
+function noRaycast() {}
+
+let shadowMap: CanvasTexture | null = null;
+function contactShadow(): CanvasTexture {
+  if (shadowMap) return shadowMap;
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const g = canvas.getContext("2d");
+  if (!g) throw new Error("canvas");
+  const gr = g.createRadialGradient(64, 64, 4, 64, 64, 62);
+  gr.addColorStop(0, "rgba(60,44,28,0.18)");
+  gr.addColorStop(1, "rgba(60,44,28,0)");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 128, 128);
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
+  shadowMap = tex;
+  return tex;
+}
+
 export function Nodes() {
   const pointsRef = useRef<Points>(null);
   const shadowRef = useRef<InstancedMesh>(null);
   const plumbRef = useRef<LineSegments>(null);
   const atlas = useMemo(() => nodeAtlas(), []);
+  const shadowTex = useMemo(() => contactShadow(), []);
   const geo = useMemo(() => {
     const g = new BufferGeometry();
     const pos = new Float32Array(NODES.length * 3);
@@ -97,10 +141,10 @@ export function Nodes() {
     const scale = new Float32Array(NODES.length);
     const tint = new Float32Array(NODES.length * 3);
     NODES.forEach((n, i) => {
-      const p = POSITIONS[n.id] ?? [0, 0, 0];
-      pos[i * 3] = p[0];
-      pos[i * 3 + 1] = p[1];
-      pos[i * 3 + 2] = p[2];
+      const live = livePositions[i];
+      pos[i * 3] = live?.x ?? 0;
+      pos[i * 3 + 1] = live?.y ?? 0;
+      pos[i * 3 + 2] = live?.z ?? 0;
       scale[i] = 0.4;
       tint[i * 3] = 1;
       tint[i * 3 + 1] = 1;
@@ -126,7 +170,7 @@ export function Nodes() {
   );
 
   const baseScale = useMemo(
-    () => NODES.map((n) => discRadius(n.id, DEGREE.get(n.id) || 1) * 2.15),
+    () => NODES.map((n) => discRadius(n.id, DEGREE.get(n.id) || 1) * 2.15 * GRAPH_SCALE),
     [],
   );
 
@@ -158,54 +202,63 @@ export function Nodes() {
 
   const plumbGeo = useMemo(() => {
     const g = new BufferGeometry();
-    g.setAttribute("position", new Float32BufferAttribute(new Float32Array(NODES.length * 6), 3));
+    g.setAttribute("position", new Float32BufferAttribute(new Float32Array(4 * 3), 3));
     return g;
   }, []);
 
-  useLayoutEffect(() => {
-    if (communityFocus == null) {
-      NODES.forEach((n, i) => {
-        const p = POSITIONS[n.id] ?? [0, 0, 0];
-        const live = livePositions[i];
-        if (!live) return;
-        live.tx = p[0];
-        live.ty = p[1];
-        live.tz = p[2];
-      });
-      return;
-    }
-    const members: number[] = [];
-    NODES.forEach((n, i) => {
-      if (n.community === communityFocus) members.push(i);
-    });
-    const cx = members.reduce((a, i) => a + (POSITIONS[NODES[i]!.id]?.[0] ?? 0), 0) / Math.max(1, members.length);
-    const cz = members.reduce((a, i) => a + (POSITIONS[NODES[i]!.id]?.[2] ?? 0), 0) / Math.max(1, members.length);
-    members.forEach((i, k) => {
-      const ang = (k / members.length) * Math.PI * 2;
-      const rad = 1.15 + (k % 5) * 0.18;
-      const live = livePositions[i];
-      if (!live) return;
-      live.tx = cx * 0.25 + Math.cos(ang) * rad;
-      live.ty = 0.15;
-      live.tz = cz * 0.25 + Math.sin(ang) * rad;
-    });
-    NODES.forEach((n, i) => {
-      if (n.community === communityFocus) return;
-      const p = POSITIONS[n.id] ?? [0, 0, 0];
-      const live = livePositions[i];
-      if (!live) return;
-      live.tx = p[0];
-      live.ty = p[1] - 0.35;
-      live.tz = p[2];
-    });
-  }, [communityFocus]);
+  const focusRef = useRef({ communityFocus, kinds, hovered, selected, introDone, reduced });
+  focusRef.current = { communityFocus, kinds, hovered, selected, introDone, reduced };
+
+  const laidOut = useRef<number | null>(null);
 
   useFrame((_, delta) => {
+    const { communityFocus: focusComm, kinds: kindOn, hovered: hov, selected: sel, introDone: done, reduced: calm } =
+      focusRef.current;
+    if (laidOut.current !== focusComm) {
+      laidOut.current = focusComm;
+      if (focusComm == null) {
+        NODES.forEach((n, i) => {
+          const p = POSITIONS[n.id] ?? [0, 0, 0];
+          const live = livePositions[i];
+          if (!live) return;
+          live.tx = p[0];
+          live.ty = placeY(n.id, p[1]);
+          live.tz = p[2];
+        });
+      } else {
+        const members: number[] = [];
+        NODES.forEach((n, i) => {
+          if (n.community === focusComm) members.push(i);
+        });
+        const cx = members.reduce((a, i) => a + (POSITIONS[NODES[i]!.id]?.[0] ?? 0), 0) / Math.max(1, members.length);
+        const cz = members.reduce((a, i) => a + (POSITIONS[NODES[i]!.id]?.[2] ?? 0), 0) / Math.max(1, members.length);
+        members.forEach((i, k) => {
+          const ang = (k / members.length) * Math.PI * 2;
+          const rad = 1.15 + (k % 5) * 0.18;
+          const live = livePositions[i];
+          const n = NODES[i];
+          if (!live || !n) return;
+          live.tx = cx * 0.25 + Math.cos(ang) * rad;
+          live.ty = placeY(n.id, 0.15);
+          live.tz = cz * 0.25 + Math.sin(ang) * rad;
+        });
+        NODES.forEach((n, i) => {
+          if (n.community === focusComm) return;
+          const p = POSITIONS[n.id] ?? [0, 0, 0];
+          const live = livePositions[i];
+          if (!live) return;
+          live.tx = p[0];
+          live.ty = placeY(n.id, p[1] - 0.35);
+          live.tz = p[2];
+        });
+      }
+    }
+
     const dt = Math.min(delta, 0.05);
-    if (!reduced && !introDone) introT.current = Math.min(1, introT.current + dt * 0.55);
+    if (!calm && !done) introT.current = Math.min(1, introT.current + dt * 0.55);
     else introT.current = 1;
 
-    const focusId = hovered || selected;
+    const focusId = hov || sel;
     const hasFocus = Boolean(focusId);
     const posAttr = geo.getAttribute("position") as Float32BufferAttribute;
     const scaleAttr = geo.getAttribute("aScale") as Float32BufferAttribute;
@@ -218,16 +271,16 @@ export function Nodes() {
       const n = NODES[i];
       const live = livePositions[i];
       if (!n || !live) continue;
-      const hidden = kindHidden(n.kind, kinds);
+      const hidden = kindHidden(n.kind, kindOn);
       hiddenFlags[i] = hidden ? 1 : 0;
-      const dimCommunity = communityFocus != null && n.community !== communityFocus;
+      const dimCommunity = focusComm != null && n.community !== focusComm;
       const inRing = !hasFocus || neighborSet.has(i);
       const targetScale = hidden ? 0.001 : inRing && !dimCommunity ? 1 : 0.62;
-      const hoverBoost = hovered === n.id || selected === n.id ? 1.08 : 1;
+      const hoverBoost = hov === n.id || sel === n.id ? 1.08 : 1;
       live.ts = targetScale * hoverBoost;
       live.s += (live.ts - live.s) * (1 - Math.exp(-dt * 12));
-      const liftTarget = hovered === n.id || selected === n.id ? 0.55 : 0;
-      live.lift += (liftTarget - live.lift) * (1 - Math.exp(-dt * (reduced ? 40 : 8)));
+      const liftTarget = hov === n.id || sel === n.id ? 0.55 : 0;
+      live.lift += (liftTarget - live.lift) * (1 - Math.exp(-dt * (calm ? 40 : 8)));
       live.x += (live.tx - live.x) * (1 - Math.exp(-dt * 8));
       live.y += (live.ty - live.y) * (1 - Math.exp(-dt * 8));
       live.z += (live.tz - live.z) * (1 - Math.exp(-dt * 8));
@@ -250,51 +303,63 @@ export function Nodes() {
 
       const shadow = shadowRef.current;
       if (shadow) {
-        const sh = hidden ? 0.0001 : Math.max(0.15, sc * 0.85 * (1 + live.lift));
-        dummy.position.set(live.x, 0.02, live.z);
+        const localR = sc / GRAPH_SCALE;
+        const sh = hidden ? 0.0001 : Math.max(0.2, localR * 1.65);
+        dummy.position.set(live.x, 0.012, live.z);
         dummy.rotation.set(-Math.PI / 2, 0, 0);
         dummy.scale.set(sh, sh, 1);
         dummy.updateMatrix();
         shadow.setMatrixAt(i, dummy.matrix);
       }
-
-      const o = i * 6;
-      const plumb = plumbGeo.getAttribute("position") as Float32BufferAttribute;
-      const arr = plumb.array as Float32Array;
-      arr[o] = live.x;
-      arr[o + 1] = 0.03;
-      arr[o + 2] = live.z;
-      arr[o + 3] = live.x;
-      arr[o + 4] = Math.max(0.05, y - sc * 0.35);
-      arr[o + 5] = live.z;
     }
     posAttr.needsUpdate = true;
     scaleAttr.needsUpdate = true;
     tintAttr.needsUpdate = true;
     if (shadowRef.current) shadowRef.current.instanceMatrix.needsUpdate = true;
+
     const plumb = plumbGeo.getAttribute("position") as Float32BufferAttribute;
+    const arr = plumb.array as Float32Array;
+    arr.fill(0);
+    const marks = [hov, sel].filter((id, idx, all): id is string => Boolean(id) && all.indexOf(id) === idx);
+    marks.forEach((id, k) => {
+      const i = indexOf(id);
+      const live = livePositions[i];
+      const n = NODES[i];
+      if (!live || !n || hiddenFlags[i] === 1) return;
+      const y = live.y + live.lift;
+      const ring = localDiscRadius(n.id, DEGREE.get(n.id) || 1, n.community) * live.s;
+      const o = k * 6;
+      arr[o] = live.x;
+      arr[o + 1] = 0.03;
+      arr[o + 2] = live.z;
+      arr[o + 3] = live.x;
+      arr[o + 4] = Math.max(0.08, y - ring * 0.35);
+      arr[o + 5] = live.z;
+    });
     plumb.needsUpdate = true;
+    plumbGeo.setDrawRange(0, marks.length * 2);
     plumbRef.current?.computeLineDistances();
   });
 
   return (
     <group>
-      <points ref={pointsRef} geometry={geo} material={mat} frustumCulled={false} renderOrder={2} />
-      <instancedMesh ref={shadowRef} args={[undefined, undefined, NODES.length]} frustumCulled={false}>
-        <circleGeometry args={[0.55, 20]} />
-        <meshBasicMaterial color="#3c2c1c" transparent opacity={0.22} depthWrite={false} />
+      <points ref={pointsRef} geometry={geo} material={mat} frustumCulled={false} renderOrder={2} raycast={noRaycast} />
+      <instancedMesh ref={shadowRef} args={[undefined, undefined, NODES.length]} frustumCulled={false} raycast={noRaycast}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial map={shadowTex} transparent opacity={1} depthWrite={false} toneMapped={false} />
       </instancedMesh>
-      <lineSegments ref={plumbRef} geometry={plumbGeo} frustumCulled={false}>
-        <lineDashedMaterial color="#7A6C58" transparent opacity={0.45} dashSize={0.12} gapSize={0.08} />
+      <lineSegments ref={plumbRef} geometry={plumbGeo} frustumCulled={false} raycast={noRaycast}>
+        <lineDashedMaterial color="#7A6C58" transparent opacity={0.55} dashSize={0.12} gapSize={0.08} />
       </lineSegments>
       <HitProxies baseScale={baseScale} />
+      <HoverInk />
     </group>
   );
 }
 
 function HitProxies({ baseScale }: { baseScale: number[] }) {
   const ref = useRef<InstancedMesh>(null);
-  const geo = useMemo(() => new SphereGeometry(0.5, 8, 6), []);
+  const geo = useMemo(() => new SphereGeometry(0.5, 10, 8), []);
   useFrame(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -303,26 +368,34 @@ function HitProxies({ baseScale }: { baseScale: number[] }) {
       if (!live) continue;
       const hidden = hiddenFlags[i] === 1;
       dummy.position.set(live.x, live.y + live.lift, live.z);
-      const s = hidden ? 0.0001 : (baseScale[i] ?? 0.4) * live.s * 0.55;
-      dummy.scale.setScalar(s);
+      const localR = ((baseScale[i] ?? 0.4) * live.s) / GRAPH_SCALE;
+      dummy.scale.setScalar(hidden ? 0.0001 : localR * 2);
       dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
   });
+
+  const choose = (instanceId: number | undefined) => {
+    if (instanceId == null) return;
+    const node = NODES[instanceId];
+    if (!node || hiddenFlags[instanceId] === 1) return;
+    useGraphStore.getState().select(node.id);
+  };
+
   return (
     <instancedMesh
       ref={ref}
       args={[geo, undefined, NODES.length]}
       frustumCulled={false}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        choose(e.instanceId);
+      }}
       onClick={(e) => {
         e.stopPropagation();
-        const id = e.instanceId;
-        if (id == null) return;
-        const node = NODES[id];
-        if (!node || hiddenFlags[id] === 1) return;
-        useGraphStore.getState().select(node.id);
+        choose(e.instanceId);
       }}
       onPointerOver={(e) => {
         e.stopPropagation();
@@ -340,5 +413,82 @@ function HitProxies({ baseScale }: { baseScale: number[] }) {
     >
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </instancedMesh>
+  );
+}
+
+const RING_SEGS = 28;
+
+function HoverInk() {
+  const { camera } = useThree();
+  const geo = useMemo(() => {
+    const g = new BufferGeometry();
+    const count = 2 * (RING_SEGS * 2 * 2 + 8);
+    g.setAttribute("position", new Float32BufferAttribute(new Float32Array(count * 3), 3));
+    return g;
+  }, []);
+
+  useFrame(() => {
+    const hov = useGraphStore.getState().hoveredId;
+    const sel = useGraphStore.getState().selectedId;
+    const ids = [hov, sel].filter((id, i, all): id is string => Boolean(id) && all.indexOf(id) === i);
+    camera.getWorldQuaternion(_q);
+    _right.set(1, 0, 0).applyQuaternion(_q);
+    _up.set(0, 1, 0).applyQuaternion(_q);
+    const attr = geo.getAttribute("position") as Float32BufferAttribute;
+    const arr = attr.array as Float32Array;
+    arr.fill(0);
+    let cursor = 0;
+    const put = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => {
+      const o = cursor * 3;
+      arr[o] = x0;
+      arr[o + 1] = y0;
+      arr[o + 2] = z0;
+      arr[o + 3] = x1;
+      arr[o + 4] = y1;
+      arr[o + 5] = z1;
+      cursor += 2;
+    };
+    for (const id of ids) {
+      const i = indexOf(id);
+      const n = NODES[i];
+      const live = livePositions[i];
+      if (!n || !live || hiddenFlags[i] === 1) continue;
+      const ring = localDiscRadius(n.id, DEGREE.get(n.id) || 1, n.community) * live.s;
+      const cx = live.x;
+      const cy = live.y + live.lift;
+      const cz = live.z;
+      const at = (ang: number, rad: number) => {
+        const c = Math.cos(ang);
+        const s = Math.sin(ang);
+        return [
+          cx + (_right.x * c + _up.x * s) * rad,
+          cy + (_right.y * c + _up.y * s) * rad,
+          cz + (_right.z * c + _up.z * s) * rad,
+        ] as const;
+      };
+      for (const rad of [ring * 0.72, ring * 1.16]) {
+        for (let s = 0; s < RING_SEGS; s++) {
+          const a0 = (s / RING_SEGS) * Math.PI * 2;
+          const a1 = ((s + 1) / RING_SEGS) * Math.PI * 2;
+          const p0 = at(a0, rad);
+          const p1 = at(a1, rad);
+          put(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+        }
+      }
+      for (let k = 0; k < 4; k++) {
+        const a = (k / 4) * Math.PI * 2;
+        const p0 = at(a, ring * 1.22);
+        const p1 = at(a, ring * 1.48);
+        put(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+      }
+    }
+    attr.needsUpdate = true;
+    geo.setDrawRange(0, cursor);
+  });
+
+  return (
+    <lineSegments geometry={geo} frustumCulled={false} raycast={noRaycast} renderOrder={3}>
+      <lineBasicMaterial color="#2A241E" transparent opacity={0.8} depthWrite={false} />
+    </lineSegments>
   );
 }

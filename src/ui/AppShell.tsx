@@ -44,13 +44,8 @@ export function AppShell() {
     const applyM = () => setMobile(mobileMq.matches);
     applyM();
     mobileMq.addEventListener("change", applyM);
-    const themeMq = window.matchMedia("(prefers-color-scheme: dark)");
-    if (themeMq.matches) useGraphStore.getState().setTheme("night");
-    const applyTheme = () => {
-      document.documentElement.dataset.theme = useGraphStore.getState().theme;
-    };
-    applyTheme();
-    const unsubTheme = useGraphStore.subscribe(applyTheme);
+    document.documentElement.dataset.theme = "paper";
+    document.documentElement.style.colorScheme = "light";
 
     const hash = readHash(window.location.hash);
     if (hash.view) setView(hash.view);
@@ -76,7 +71,6 @@ export function AppShell() {
     return () => {
       mq.removeEventListener("change", apply);
       mobileMq.removeEventListener("change", applyM);
-      unsubTheme();
     };
   }, [select, setMobile, setReduced, setView]);
 

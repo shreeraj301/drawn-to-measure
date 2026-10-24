@@ -246,6 +246,13 @@ export function IconNext() {
     </Glyph>
   );
 }
+export function IconMenu() {
+  return (
+    <Glyph>
+      <path d="M4 7h16M4 12h16M4 17h16" {...ink} />
+    </Glyph>
+  );
+}
 export function IconNight() {
   return (
     <Glyph>
