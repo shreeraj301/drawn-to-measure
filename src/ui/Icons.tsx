@@ -1,4 +1,4 @@
-/** Silhouettes that match the models on the sheet. Stroke only, no fill blobs. */
+/** Small ink marks that match the instruments on the sheet. */
 
 export function KindIcon({ kind, className }: { kind: string; className?: string }) {
   return (
@@ -41,75 +41,73 @@ function Mark({ kind }: { kind: string }) {
     case "Person":
       return (
         <g {...p}>
-          <circle cx="12" cy="7" r="2.2" />
-          <path d="M8 20c.4-3.2 1.8-5 4-5s3.6 1.8 4 5" />
-          <path d="M6 21h12" />
+          <circle cx="12" cy="8" r="2.4" />
+          <path d="M7 19c.6-3 2.4-4.5 5-4.5s4.4 1.5 5 4.5" />
         </g>
       );
     case "Place":
       return (
         <g {...p}>
-          <path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z" />
-          <circle cx="12" cy="11" r="1.6" />
+          <path d="M12 21s6-5.2 6-9.5A6 6 0 0 0 6 11.5C6 15.8 12 21 12 21z" />
+          <circle cx="12" cy="11.5" r="1.6" />
         </g>
       );
     case "Program/University":
       return (
         <g {...p}>
-          <path d="M3 10l9-5 9 5-9 5z" />
-          <path d="M7 12v5M12 14.5V17M17 12v5M5 18h14" />
+          <path d="M3 10l9-5 9 5-9 5-9-5z" />
+          <path d="M7 12v5c2 1.4 4 1.4 10 0v-5" />
         </g>
       );
     case "Bot/Agent":
       return (
         <g {...p}>
-          <rect x="6" y="8" width="12" height="9" rx="1.5" />
-          <path d="M12 8V5M10 5h4" />
-          <path d="M9 12h.01M15 12h.01M9 18v2M15 18v2" />
+          <rect x="6" y="7" width="12" height="10" rx="2" />
+          <circle cx="9.5" cy="11.5" r="1" />
+          <circle cx="14.5" cy="11.5" r="1" />
+          <path d="M12 4v3" />
         </g>
       );
     case "Theme":
       return (
         <g {...p}>
-          <circle cx="12" cy="12" r="7" />
-          <path d="M12 6v12M6 12h12" />
-          <path d="M12 6l2 3h-4z" />
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" />
         </g>
       );
     case "Goal/Career path":
       return (
         <g {...p}>
-          <path d="M4 12h10" />
-          <path d="M12 7l6 5-6 5" />
+          <path d="M5 19l14-8" />
+          <path d="M15 7l4 4-4 1" />
         </g>
       );
     case "Channel":
       return (
         <g {...p}>
-          <path d="M12 20V8" />
-          <path d="M8 11a4 4 0 0 1 8 0M6 8a7 7 0 0 1 12 0" />
-          <circle cx="12" cy="20" r="1.2" />
+          <path d="M5 9h10v6H5z" />
+          <path d="M15 11l4-2v6l-4-2" />
         </g>
       );
     case "Education":
       return (
         <g {...p}>
-          <path d="M12 6c-2 2-5 3-8 3v9c3 0 6-1 8-3 2 2 5 3 8 3V9c-3 0-6-1-8-3z" />
-          <path d="M12 6v12" />
+          <path d="M4 7h7v12H4zM13 7h7v12h-7z" />
+          <path d="M11 7v12" />
         </g>
       );
     case "Preference/Value":
       return (
         <g {...p}>
-          <circle cx="12" cy="13" r="6" />
-          <path d="M12 8l1.2 2.4 2.6.2-2 1.8.6 2.6L12 13.8 9.6 15l.6-2.6-2-1.8 2.6-.2z" />
+          <circle cx="12" cy="10" r="4" />
+          <path d="M9 14l-1 6 4-2 4 2-1-6" />
         </g>
       );
     default:
       return (
         <g {...p}>
-          <rect x="5" y="7" width="14" height="10" rx="1" />
-          <path d="M9 7V5h6v2M10 12h4" />
+          <path d="M5 6h14v12H5z" />
+          <path d="M8 10h8M8 13h6" />
         </g>
       );
   }

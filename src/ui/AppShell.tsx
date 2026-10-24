@@ -1,18 +1,20 @@
 import { useEffect } from "react";
 import { GraphScene } from "@/scene/GraphScene";
+import { LabelLayer } from "@/scene/Labels";
 import { readHash, writeHash } from "@/lib/graph/hash";
 import { getNode, neighborsOf } from "@/lib/graph/model";
 import { tourById } from "@/lib/graph/tours";
 import { useGraphStore } from "@/state/store";
 import { CommandPalette } from "./CommandPalette";
 import { DetailPanel } from "./DetailPanel";
-import { Filters } from "./Filters";
 import { Intro } from "./Intro";
-import { Legend } from "./Legend";
-import { PathFinder } from "./PathFinder";
+import { NodeList } from "./NodeList";
+import { SidePanel } from "./SidePanel";
 import { TitleBlock } from "./TitleBlock";
 import { Toolbar } from "./Toolbar";
-import { TourCaption, ToursMenu } from "./Tours";
+import { TourCaption } from "./Tours";
+import { HelpGuide } from "./HelpGuide";
+import { SelectionCaption } from "./SelectionCaption";
 import { playHover, playSelect } from "./sound";
 
 export function AppShell() {
@@ -102,7 +104,19 @@ export function AppShell() {
         setPalette(!useGraphStore.getState().paletteOpen);
         return;
       }
-      if (paletteOpen) return;
+      if (e.key === "Escape") {
+        const s = useGraphStore.getState();
+        if (s.paletteOpen) { s.setPaletteOpen(false); return; }
+        if (s.helpOpen) { s.setHelpOpen(false); return; }
+        if (s.sideTab) { s.setSideTab(null); return; }
+        if (s.selectedId) { s.select(null, { push: false }); return; }
+        if (s.tourId) { s.stopTour(); return; }
+      }
+      if (e.key === "?" && !typing) {
+        e.preventDefault();
+        useGraphStore.getState().setHelpOpen(!useGraphStore.getState().helpOpen);
+        return;
+      }
       if (typing) return;
       const viewKeys: Record<string, "plan" | "elevation" | "axonometric" | "perspective"> = {
         Digit1: "plan",
@@ -146,16 +160,22 @@ export function AppShell() {
 
   return (
     <div className="sn-app">
-      <GraphScene />
+      <a className="sn-skip" href="#node-list">Skip to the list of nodes</a>
       <Toolbar />
-      <Legend />
-      <Filters />
-      <PathFinder />
-      <ToursMenu />
-      <DetailPanel />
-      <TitleBlock />
+      <div className="sn-frame">
+        <SidePanel />
+        <div className="sn-stage">
+          <GraphScene />
+          <LabelLayer />
+          <SelectionCaption />
+          <TitleBlock />
+        </div>
+        <DetailPanel />
+      </div>
       <TourCaption />
       <CommandPalette />
+      <HelpGuide />
+      <NodeList />
       <Intro />
     </div>
   );

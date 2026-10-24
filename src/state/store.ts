@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { KINDS } from "@/lib/graph/model";
 
+export type NodeStyle = "instruments" | "stamps";
+
 export type CameraView = "perspective" | "plan" | "elevation" | "axonometric";
 
 export type FocusRequest = {
@@ -32,9 +34,8 @@ type GraphState = {
   idle: boolean;
 
   paletteOpen: boolean;
-  filtersOpen: boolean;
-  toursOpen: boolean;
-  legendOpen: boolean;
+  sideTab: "filters" | "communities" | "tours" | null;
+  helpOpen: boolean;
 
   pathFrom: string | null;
   pathTo: string | null;
@@ -47,6 +48,7 @@ type GraphState = {
 
   soundOn: boolean;
   mobile: boolean;
+  nodeStyle: NodeStyle;
   /** Bumps while community springs are sliding, so edges can follow. */
   motionTick: number;
 
@@ -68,9 +70,8 @@ type GraphState = {
   setIdle: (v: boolean) => void;
 
   setPaletteOpen: (v: boolean) => void;
-  setFiltersOpen: (v: boolean) => void;
-  setToursOpen: (v: boolean) => void;
-  setLegendOpen: (v: boolean) => void;
+  setSideTab: (v: "filters" | "communities" | "tours" | null) => void;
+  setHelpOpen: (v: boolean) => void;
 
   setPathFrom: (id: string | null) => void;
   setPathTo: (id: string | null) => void;
@@ -84,6 +85,7 @@ type GraphState = {
 
   setSoundOn: (v: boolean) => void;
   setMobile: (v: boolean) => void;
+  setNodeStyle: (v: NodeStyle) => void;
   bumpMotion: () => void;
 
   touchActivity: () => void;
@@ -113,9 +115,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   idle: false,
 
   paletteOpen: false,
-  filtersOpen: false,
-  toursOpen: false,
-  legendOpen: false,
+  sideTab: null,
+  helpOpen: false,
 
   pathFrom: null,
   pathTo: null,
@@ -128,6 +129,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   soundOn: false,
   mobile: false,
+  nodeStyle: "instruments",
   motionTick: 0,
   lastActivity: 0,
 
@@ -207,10 +209,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setIntroDone: (v) => set({ introDone: v }),
   setIdle: (v) => set({ idle: v }),
 
-  setPaletteOpen: (v) => set({ paletteOpen: v, ...(v ? { filtersOpen: false, toursOpen: false } : {}) }),
-  setFiltersOpen: (v) => set({ filtersOpen: v }),
-  setToursOpen: (v) => set({ toursOpen: v }),
-  setLegendOpen: (v) => set({ legendOpen: v }),
+  setPaletteOpen: (v) => set({ paletteOpen: v }),
+  setSideTab: (v) => set({ sideTab: v, helpOpen: false, paletteOpen: false }),
+  setHelpOpen: (v) => set({ helpOpen: v, sideTab: v ? null : get().sideTab }),
 
   setPathFrom: (id) => set({ pathFrom: id }),
   setPathTo: (id) => set({ pathTo: id }),
@@ -222,7 +223,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       tourId: id,
       tourStep: 0,
       tourPlaying: true,
-      toursOpen: false,
+      sideTab: null,
       communityFocus: null,
       idle: false,
       lastActivity: performance.now(),
@@ -233,6 +234,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   setSoundOn: (v) => set({ soundOn: v }),
   setMobile: (v) => set({ mobile: v }),
+  setNodeStyle: (v) => set({ nodeStyle: v }),
   bumpMotion: () => set((s) => ({ motionTick: (s.motionTick + 1) % 100000 })),
   touchActivity: () => set({ idle: false, lastActivity: performance.now() }),
 }));

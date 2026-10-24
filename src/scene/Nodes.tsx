@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
   Color,
@@ -9,7 +9,7 @@ import {
 import { communityColor, nodeRadius } from "@/lib/graph/colors";
 import { DEGREE, LINKS, MAX_DEGREE, NODES, POSITIONS } from "@/lib/graph/model";
 import { useGraphStore } from "@/state/store";
-import { geometryFor } from "./marks";
+import { geometryForNode } from "./marks";
 
 const KINDS = [
   "Project",
@@ -27,6 +27,10 @@ const KINDS = [
   "Experience",
 ] as const;
 
+
+const dummy = new Object3D();
+const colorScratch = new Color();
+
 function yawOf(id: string): number {
   let h = 2166136261;
   for (let i = 0; i < id.length; i++) {
@@ -35,9 +39,6 @@ function yawOf(id: string): number {
   }
   return ((h >>> 0) % 628) / 100;
 }
-
-const dummy = new Object3D();
-const colorScratch = new Color();
 
 type Live = {
   x: number;
@@ -85,9 +86,10 @@ export function Nodes() {
     return map;
   }, []);
 
-  const meshes = useRef<Map<string, InstancedMesh>>(new Map());
+  const meshes = useRef<(InstancedMesh | null)[]>([]);
   const shadowRef = useRef<InstancedMesh>(null);
   const yaws = useMemo(() => NODES.map((n) => yawOf(n.id)), []);
+  const nodeStyle = useGraphStore((s) => s.nodeStyle);
   const hovered = useGraphStore((s) => s.hoveredId);
   const selected = useGraphStore((s) => s.selectedId);
   const communityFocus = useGraphStore((s) => s.communityFocus);
@@ -112,18 +114,6 @@ export function Nodes() {
     }
     return set;
   }, [hovered, selected]);
-
-  const geos = useMemo(() => {
-    const g = new Map<string, ReturnType<typeof geometryFor>>();
-    for (const k of groups.keys()) g.set(k, geometryFor(k));
-    return g;
-  }, [groups]);
-
-  useEffect(() => {
-    return () => {
-      for (const g of geos.values()) g.dispose();
-    };
-  }, [geos]);
 
   // Community spring targets.
   useLayoutEffect(() => {
@@ -170,6 +160,10 @@ export function Nodes() {
     [],
   );
 
+  const geos = useMemo(() => {
+    return NODES.map((n) => geometryForNode(n.id, n.kind, nodeStyle === "stamps"));
+  }, [nodeStyle]);
+
   const introT = useRef(reduced ? 1 : 0);
 
   useFrame((_, delta) => {
@@ -203,36 +197,35 @@ export function Nodes() {
       live.z += (live.tz - live.z) * (1 - Math.exp(-dt * kSpring));
     }
 
-    for (const [kind, indexes] of groups) {
-      const mesh = meshes.current.get(kind);
+    for (let i = 0; i < NODES.length; i++) {
+      const mesh = meshes.current[i];
       if (!mesh) continue;
-      indexes.forEach((nodeIndex, instance) => {
-        const n = NODES[nodeIndex];
-        const live = livePositions[nodeIndex];
-        if (!n || !live) return;
-        const hidden = hiddenFlags[nodeIndex] === 1;
-        const hasFocus = Boolean(hovered || selected);
-        const inRing = !hasFocus || neighborSet.has(nodeIndex);
-        const dimCommunity = communityFocus != null && n.community !== communityFocus;
-        let intro = 1;
-        if (introT.current < 1 && n.id !== "shreeraj") {
-          const delay = (n.community / 13) * 0.45;
-          intro = Math.max(0, Math.min(1, (introT.current - delay) / 0.4));
-        }
-        const sc = baseScale[nodeIndex] * live.s * (hidden ? 0 : intro);
-        const yLift =
-          introT.current < 1 && n.id !== "shreeraj"
-            ? (intro - 1) * 1.4
-            : 0;
-        dummy.position.set(live.x, live.y + live.lift + yLift + 0.02, live.z);
-        dummy.scale.setScalar(Math.max(0.0001, sc * 1.05));
-        dummy.rotation.set(0, yaws[nodeIndex] ?? 0, 0);
-        dummy.updateMatrix();
-        mesh.setMatrixAt(instance, dummy.matrix);
-        const dim = hidden || (hasFocus && !inRing) || dimCommunity ? 0.28 : 1;
-        mesh.setColorAt(instance, colorScratch.set(colors[nodeIndex]).multiplyScalar(0.55 + 0.45 * dim));
-      });
+      const n = NODES[i];
+      const live = livePositions[i];
+      if (!n || !live) continue;
+      const hidden = hiddenFlags[i] === 1;
+      const hasFocus = Boolean(hovered || selected);
+      const inRing = !hasFocus || neighborSet.has(i);
+      const dimCommunity = communityFocus != null && n.community !== communityFocus;
+      let intro = 1;
+      if (introT.current < 1 && n.id !== "shreeraj") {
+        const delay = (n.community / 13) * 0.45;
+        intro = Math.max(0, Math.min(1, (introT.current - delay) / 0.4));
+      }
+      const sc = baseScale[i] * live.s * (hidden ? 0 : intro);
+      const yLift =
+        introT.current < 1 && n.id !== "shreeraj"
+          ? (intro - 1) * 1.4
+          : 0;
+      const size = Math.max(0.0001, sc * (nodeStyle === "stamps" ? 0.9 : 0.72));
+      dummy.position.set(live.x, live.y + live.lift + yLift + 0.02, live.z);
+      dummy.scale.setScalar(size);
+      dummy.rotation.set(0, yaws[i] ?? 0, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(0, dummy.matrix);
       mesh.instanceMatrix.needsUpdate = true;
+      const dim = hidden || (hasFocus && !inRing) || dimCommunity ? 0.28 : 1;
+      mesh.setColorAt(0, colorScratch.set(colors[i]).multiplyScalar(0.55 + 0.45 * dim));
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
 
@@ -245,7 +238,7 @@ export function Nodes() {
         const sc = (baseScale[i] ?? 1) * live.s;
         dummy.position.set(live.x, 0.012, live.z);
         dummy.rotation.set(-Math.PI / 2, 0, 0);
-        const s = hidden ? 0.0001 : Math.max(0.2, sc * 0.9);
+        const s = hidden ? 0.0001 : Math.max(0.12, sc * 0.28);
         dummy.scale.set(s, s, s);
         dummy.updateMatrix();
         shadow.setMatrixAt(i, dummy.matrix);
@@ -256,17 +249,17 @@ export function Nodes() {
 
   return (
     <group>
-      {[...groups.entries()].map(([kind, indexes]) => (
+      {NODES.map((n, i) => (
         <instancedMesh
-          key={kind}
+          key={n.id + nodeStyle}
           ref={(el) => {
-            if (el) meshes.current.set(kind, el);
+            meshes.current[i] = el;
           }}
-          args={[geos.get(kind), undefined, indexes.length]}
+          args={[geos[i], undefined, 1]}
           frustumCulled={false}
           castShadow
         >
-          <meshStandardMaterial roughness={0.62} metalness={0.08} />
+          <meshStandardMaterial roughness={0.86} metalness={0.02} />
         </instancedMesh>
       ))}
       <instancedMesh
@@ -274,15 +267,14 @@ export function Nodes() {
         args={[undefined, undefined, NODES.length]}
         frustumCulled={false}
       >
-        <circleGeometry args={[0.55, 16]} />
-        <meshBasicMaterial color="#14191A" transparent opacity={0.14} depthWrite={false} />
+        <circleGeometry args={[0.42, 20]} />
+        <meshBasicMaterial color="#14191A" transparent opacity={0.12} depthWrite={false} />
       </instancedMesh>
       <HitProxies />
     </group>
   );
 }
 
-/** Invisible pick spheres so hover stays accurate when the visible mesh is thin. */
 function HitProxies() {
   const ref = useRef<InstancedMesh>(null);
   const geo = useMemo(() => new SphereGeometry(0.34, 8, 6), []);
@@ -307,7 +299,7 @@ function HitProxies() {
       if (!live) continue;
       const hidden = hiddenFlags[i] === 1;
       dummy.position.set(live.x, live.y + live.lift + 0.05, live.z);
-      dummy.scale.setScalar(hidden ? 0.0001 : 1);
+      dummy.scale.setScalar(hidden ? 0.0001 : 1.15 * live.s);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }

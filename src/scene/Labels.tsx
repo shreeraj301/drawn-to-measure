@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import { Vector3 } from "three";
 import { DEGREE, NODES } from "@/lib/graph/model";
 import { useGraphStore } from "@/state/store";
@@ -9,11 +8,43 @@ import { hiddenFlags, nodeWorld } from "./Nodes";
 const MAX_LABELS = 32;
 const v = new Vector3();
 
-type Spot = { key: string; label: string; x: number; y: number; hot: boolean };
+export type LabelSpot = { key: string; label: string; x: number; y: number; hot: boolean };
+
+let spots: LabelSpot[] = [];
+const listeners = new Set<() => void>();
+
+function publish(next: LabelSpot[]) {
+  spots = next;
+  listeners.forEach((l) => l());
+}
+
+export function LabelLayer() {
+  const items = useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    () => spots,
+    () => spots,
+  );
+  return (
+    <div className="sn-label-layer" aria-hidden>
+      {items.map((s) => (
+        <span
+          key={s.key}
+          className={s.hot ? "sn-label is-hot" : "sn-label"}
+          style={{ transform: "translate(" + s.x + "px," + s.y + "px)" }}
+        >
+          {s.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Screen-space labels for the nearest important nodes.
- * A simple overlap test keeps callouts from stacking.
+ * Positions are published to the DOM layer so they do not open a second React root.
  */
 export function Labels() {
   const { camera, size } = useThree();
@@ -21,18 +52,19 @@ export function Labels() {
   const hovered = useGraphStore((s) => s.hoveredId);
   const selected = useGraphStore((s) => s.selectedId);
   const cap = mobile ? 14 : MAX_LABELS;
-  const [spots, setSpots] = useState<Spot[]>([]);
   const last = useRef("");
 
   const ranked = useMemo(() => {
     return NODES.map((n, i) => ({ i, deg: DEGREE.get(n.id) || 0, id: n.id })).sort((a, b) => b.deg - a.deg);
   }, []);
 
+  useEffect(() => () => publish([]), []);
+
   useFrame(() => {
     const w = size.width;
     const h = size.height;
     const placed: { x: number; y: number }[] = [];
-    const next: Spot[] = [];
+    const next: LabelSpot[] = [];
     const focus = hovered || selected;
 
     const consider = (index: number, force: boolean) => {
@@ -75,23 +107,9 @@ export function Labels() {
     const sig = next.map((s) => s.key + s.x + "," + s.y + (s.hot ? "!" : "")).join("|");
     if (sig !== last.current) {
       last.current = sig;
-      setSpots(next);
+      publish(next);
     }
   });
 
-  return (
-    <Html fullscreen zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
-      <div className="sn-label-layer">
-        {spots.map((s) => (
-          <span
-            key={s.key}
-            className={s.hot ? "sn-label is-hot" : "sn-label"}
-            style={{ transform: "translate(" + s.x + "px," + s.y + "px)" }}
-          >
-            {s.label}
-          </span>
-        ))}
-      </div>
-    </Html>
-  );
+  return null;
 }

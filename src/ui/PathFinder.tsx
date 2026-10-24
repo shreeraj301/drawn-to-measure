@@ -4,7 +4,6 @@ import { searchNodes } from "@/lib/graph/search";
 import { useGraphStore } from "@/state/store";
 
 export function PathFinder() {
-  const open = useGraphStore((s) => s.filtersOpen);
   const from = useGraphStore((s) => s.pathFrom);
   const to = useGraphStore((s) => s.pathTo);
   const path = useGraphStore((s) => s.pathNodes);
@@ -30,8 +29,6 @@ export function PathFinder() {
     });
   }, [path]);
 
-  if (!open) return null;
-
   const run = (a: string | null, b: string | null) => {
     if (!a || !b) {
       setPath(null);
@@ -43,7 +40,7 @@ export function PathFinder() {
   };
 
   return (
-    <section className="sn-panel sn-path" aria-label="Path finder">
+    <section className="sn-path" aria-label="Path finder">
       <h2>Path</h2>
       <NodeField
         label="From"

@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import { ADJACENCY, LINKS, getNode, relationLabel } from "@/lib/graph/model";
 import { useGraphStore } from "@/state/store";
 import { KindIcon } from "./Icons";
+import { kindLabel } from "./SidePanel";
 
 export function DetailPanel() {
   const id = useGraphStore((s) => s.selectedId);
@@ -35,7 +36,7 @@ export function DetailPanel() {
 
   return (
     <aside
-      className={mobile ? "sn-sheet sn-sheet-mobile" : "sn-sheet"}
+      className={mobile ? "sn-drawer sn-drawer-mobile" : "sn-drawer"}
       role="dialog"
       aria-label={node.label}
     >
@@ -44,7 +45,7 @@ export function DetailPanel() {
         <div className="sn-tags">
           <span className="sn-tag">
             <KindIcon kind={node.kind} className="sn-kind-icon" />
-            {node.kind}
+            {kindLabel(node.kind)}
           </span>
           <span className="sn-tag sn-tag-quiet">{node.community_name}</span>
         </div>
@@ -99,7 +100,7 @@ export function DetailPanel() {
                 <li key={row.link.source + row.link.target + relation}>
                   <button type="button" onClick={() => select(row.other.id)}>
                     <span>{row.other.label}</span>
-                    <span className="sn-rel-kind">{row.other.kind}</span>
+                    <span className="sn-rel-kind">{kindLabel(row.other.kind)}</span>
                   </button>
                   {row.link.confidence === "INFERRED" ? (
                     <p className="sn-why">
@@ -121,7 +122,7 @@ function uniqueSources(node: NonNullable<ReturnType<typeof getNode>>): { key: st
   const out: { key: string; label: string; url?: string }[] = [];
   const seen = new Set<string>();
   const push = (label: string | undefined | null, url?: string | null, file?: string | null) => {
-    const name = label || file || url;
+    const name = humanSource(label || file || url);
     if (!name) return;
     const key = `${name}|${url ?? ""}`;
     if (seen.has(key)) return;
@@ -133,4 +134,18 @@ function uniqueSources(node: NonNullable<ReturnType<typeof getNode>>): { key: st
   }
   push(node.source_file, node.source_url, node.source_file);
   return out;
+}
+
+function humanSource(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const map: Record<string, string> = {
+    "live-sites-scrape.json": "Live sites",
+    "linkedin.json": "LinkedIn",
+    "resume.json": "Resume",
+    "portfolio.json": "Portfolio",
+  };
+  const base = raw.split("/").pop() || raw;
+  if (map[base]) return map[base];
+  if (base.endsWith(".json")) return base.replace(/[-_]/g, " ").replace(".json", "");
+  return raw;
 }
