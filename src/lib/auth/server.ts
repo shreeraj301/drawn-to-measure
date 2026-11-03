@@ -74,9 +74,9 @@ const env = (key: string): string | undefined => {
 // provisions auth; set it to "false" to force auth off everywhere (dev user).
 const authDisabled = env("VITE_AUTH_ENABLED") === "false";
 
-// Broker federation creds: the deployer injects a per-app client when deployed;
-// otherwise fall back to the shared live-preview client, which the broker accepts
-// for any `*.grok-sandbox.com` callback (see `./preview`).
+// Broker federation creds: the deployer injects a per-app client when deployed.
+// Otherwise use the shared live-preview client. Its secret is
+// GROK_PREVIEW_CLIENT_SECRET and is never stored in the repo (see `./preview`).
 const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
 const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
