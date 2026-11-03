@@ -1,15 +1,22 @@
 # Drawn to Measure
 
-A three dimensional drawing of Shreeraj Narwade. The graph is the data. Nothing in the scene is invented.
+A three dimensional drawing of Shreeraj Narwade, where the graph is the data and nothing in the scene is invented.
+
+![Orbiting the sheet, switching views, and opening Mumbai](docs/demo.gif)
+
+## Live demo
+
+There is no live demo yet. Run the drawing locally with the command below.
 
 ## Run
 
-```
-npm install
-npm run dev
+```bash
+npm install && npm run dev
 ```
 
-`npm run build` produces the static site.
+Then open http://localhost:8080.
+
+`npm run build` writes the static site.
 
 ## Replace the graph
 
@@ -17,7 +24,7 @@ npm run dev
 2. Save it as `src/data/graph.json`. Keep `nodes`, `links`, and `hyperedges`.
 3. Rebuild the frozen layout:
 
-```
+```bash
 node scripts/build-layout.mjs
 ```
 
@@ -25,7 +32,7 @@ The layout uses a fixed seed, so the drawing is the same on every load until you
 
 ## Checks
 
-```
+```bash
 node --experimental-strip-types scripts/check-dashes.ts
 ```
 
